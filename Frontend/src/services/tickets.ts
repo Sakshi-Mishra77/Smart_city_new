@@ -46,7 +46,12 @@ export const ticketService = {
     priority?: string;
     category?: string;
   }): Promise<ApiResponse<Ticket[]>> {
-    const queryParams = filters ? `?${new URLSearchParams(filters as any).toString()}` : '';
+    const params = new URLSearchParams();
+    if (filters?.status) params.set('status', filters.status);
+    if (filters?.priority) params.set('priority', filters.priority);
+    if (filters?.category) params.set('category', filters.category);
+    const query = params.toString();
+    const queryParams = query ? `?${query}` : '';
     return apiClient.get<Ticket[]>(`${API_ENDPOINTS.TICKETS.LIST}${queryParams}`);
   },
 

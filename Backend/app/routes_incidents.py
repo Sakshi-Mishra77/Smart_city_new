@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from app.database import incidents, messages, tickets
@@ -12,6 +13,7 @@ from app.auth import get_current_user, get_official_user
 from app.utils import serialize_doc, serialize_list, to_object_id
 
 router = APIRouter(prefix="/api")
+LOGGER = logging.getLogger(__name__)
 
 def _now_iso():
     return datetime.utcnow().isoformat()
@@ -55,13 +57,13 @@ def _can_access_incident(doc: dict, user: dict):
 def _notify_new_issue(description: str, lat: float | None, lon: float | None):
     try:
         send_alert_email(description, lat, lon)
-    except Exception:
-        pass
+    except Exception as exc:
+        LOGGER.warning("Alert email notification failed: %s", exc)
     text = f"SafeLive alert: {description}. Location {lat}, {lon}."
     try:
         send_stakeholder_notifications(text)
-    except Exception:
-        pass
+    except Exception as exc:
+        LOGGER.warning("Stakeholder notification failed: %s", exc)
 
 def _create_ticket_from_incident(doc: dict):
     if not doc:

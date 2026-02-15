@@ -10,6 +10,7 @@ incidents = db["incidents"]
 tickets = db["tickets"]
 messages = db["messages"]
 password_resets = db["password_resets"]
+otp_challenges = db["otp_challenges"]
 issues_collection = incidents
 
 atexit.register(client.close)
@@ -63,5 +64,11 @@ def init_db():
     try:
         password_resets.create_index("token", unique=True)
         password_resets.create_index("expiresAt", expireAfterSeconds=0)
+    except OperationFailure:
+        pass
+
+    try:
+        otp_challenges.create_index("expiresAt", expireAfterSeconds=0)
+        otp_challenges.create_index([("userId", 1), ("purpose", 1), ("used", 1)])
     except OperationFailure:
         pass

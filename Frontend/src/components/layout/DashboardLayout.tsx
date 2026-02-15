@@ -1,6 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
+  type LucideIcon,
   Shield, 
   Home, 
   Camera, 
@@ -21,7 +22,14 @@ interface DashboardLayoutProps {
   onSettingsClick?: () => void;
 }
 
-const navItems = [
+type NavItem = {
+  icon: LucideIcon;
+  label: string;
+  path: string;
+  badge?: string;
+};
+
+const navItems: NavItem[] = [
   { icon: Home, label: 'Dashboard', path: '/dashboard' },
   { icon: Camera, label: 'Report Incident', path: '/dashboard/report' },
 ];

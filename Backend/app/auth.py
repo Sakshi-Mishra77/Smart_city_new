@@ -1,20 +1,24 @@
 from datetime import datetime, timedelta
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
-from passlib.context import CryptContext
 from app.config.settings import settings
 from app.database import users
 from app.utils import serialize_doc
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
-def hash_password(password):
-    return pwd_context.hash(password)
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
-def verify_password(password, hashed):
-    return pwd_context.verify(password, hashed)
+def verify_password(password: str, hashed: str) -> bool:
+    if not hashed:
+        return False
+    try:
+        return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
+    except Exception:
+        return False
 
 def create_token(data: dict, expires_minutes: int | None = None):
     expires = datetime.utcnow() + timedelta(minutes=expires_minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -49,7 +53,10 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     
     if not db_user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    return serialize_doc(db_user)
+    data = serialize_doc(db_user)
+    if data:
+        data.pop("password", None)
+    return data
 
 def get_official_user(current_user: dict = Depends(get_current_user)):
     if current_user.get("userType") != "official":

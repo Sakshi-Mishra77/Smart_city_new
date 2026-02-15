@@ -25,9 +25,11 @@ export type MapMarker = {
   type?: string;
 };
 
+export type HeatmapPoint = { lat: number; lng: number; weight?: number };
+
 type LeafletMapProps = {
   markers: MapMarker[];
-  heatmapPoints?: { lat: number; lng: number; weight?: number }[];
+  heatmapPoints?: HeatmapPoint[];
   showHeatmap?: boolean;
   center?: { lat: number; lng: number };
   zoom?: number;
@@ -47,13 +49,13 @@ const FitBounds = ({ markers }: { markers: MapMarker[] }) => {
   return null;
 };
 
-const HeatmapLayer = ({ points, showHeatmap }: { points: any[], showHeatmap: boolean }) => {
+const HeatmapLayer = ({ points, showHeatmap }: { points: HeatmapPoint[]; showHeatmap: boolean }) => {
   const map = useMap();
 
   useEffect(() => {
     if (!showHeatmap || points.length === 0) return;
 
-    const heatPoints = points.map((p) => [p.lat, p.lng, p.weight || 1]);
+    const heatPoints: [number, number, number][] = points.map((p) => [p.lat, p.lng, p.weight ?? 1]);
     
     const heatLayer = L.heatLayer(heatPoints, {
       radius: 25,

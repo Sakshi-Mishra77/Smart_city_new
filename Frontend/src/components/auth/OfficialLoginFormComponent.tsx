@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Captcha } from '@/components/ui/Captcha';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { authService } from '@/services/auth';
+import { authService, isAuthResponse, isOtpChallenge } from '@/services/auth';
 
 interface OfficialLoginData {
   email: string;
@@ -23,6 +23,19 @@ export const OfficialLoginFormComponent = () => {
   const [captchaValue, setCaptchaValue] = useState('');
   const [isCaptchaValid, setIsCaptchaValid] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [otpChallengeId, setOtpChallengeId] = useState<string | null>(null);
+  const [otpValue, setOtpValue] = useState('');
+  const [otpHint, setOtpHint] = useState('your email');
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+
+  const describeChannels = (channels?: string[]) => {
+    const set = new Set(channels || []);
+    const hasEmail = set.has('email');
+    const hasSms = set.has('sms');
+    if (hasEmail && hasSms) return 'your email and phone';
+    if (hasSms) return 'your phone';
+    return 'your email';
+  };
 
   const form = useForm<OfficialLoginData>({
     mode: 'onBlur',
@@ -44,7 +57,18 @@ export const OfficialLoginFormComponent = () => {
         email: data.email,
         password: data.password
       });
-      if (response.success && response.data?.user.userType === 'official') {
+      const result = response.data;
+      if (response.success && isOtpChallenge(result) && result.requiresOtp) {
+        setOtpChallengeId(result.challengeId);
+        setOtpValue('');
+        setOtpHint(describeChannels(result.channels));
+        toast({
+          title: "OTP Sent",
+          description: `Enter the code sent to ${describeChannels(result.channels)} to finish signing in.`,
+        });
+        return;
+      }
+      if (response.success && isAuthResponse(result) && result.user.userType === 'official') {
         toast({
           title: "Official Login Successful",
           description: "Redirecting to official dashboard"
@@ -69,6 +93,49 @@ export const OfficialLoginFormComponent = () => {
     }
   };
 
+  const handleVerifyOtp = async () => {
+    if (!otpChallengeId) return;
+    const trimmed = otpValue.trim();
+    if (!trimmed) {
+      toast({
+        title: "OTP Required",
+        description: "Enter the verification code.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsVerifyingOtp(true);
+    try {
+      const response = await authService.verifyOtp(otpChallengeId, trimmed);
+      if (response.success && response.data?.user.userType === 'official') {
+        toast({
+          title: "Verification Successful",
+          description: "Redirecting to official dashboard",
+        });
+        setOtpChallengeId(null);
+        setOtpValue('');
+        setTimeout(() => navigate('/official/dashboard'), 500);
+        return;
+      }
+      if (response.success) {
+        toast({
+          title: "Access Denied",
+          description: "Official account required",
+          variant: "destructive",
+        });
+        await authService.logout();
+        return;
+      }
+      toast({
+        title: "Verification Failed",
+        description: response.error || "Invalid code. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-md mx-auto animate-fade-in">
       <div className="bg-card rounded-2xl shadow-card p-8 border border-border">
@@ -77,7 +144,62 @@ export const OfficialLoginFormComponent = () => {
           <p className="text-muted-foreground">Sign in as municipal or society admin</p>
         </div>
 
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-5">
+        {otpChallengeId ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleVerifyOtp();
+            }}
+            className="space-y-5"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="otp">Verification Code</Label>
+              <Input
+                id="otp"
+                inputMode="numeric"
+                placeholder="Enter 6-digit code"
+                value={otpValue}
+                onChange={(e) => setOtpValue(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                A one-time code was sent to {otpHint}.
+              </p>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full gradient-accent hover:opacity-90 transition-opacity"
+              size="lg"
+              disabled={isVerifyingOtp}
+            >
+              {isVerifyingOtp ? (
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin" />
+                  Verifying...
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <LogIn className="h-4 w-4" />
+                  Verify & Continue
+                </div>
+              )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setOtpChallengeId(null);
+                setOtpValue('');
+              }}
+              disabled={isVerifyingOtp}
+            >
+              Back to Login
+            </Button>
+          </form>
+        ) : (
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="email">Official Email</Label>
             <Input
@@ -165,7 +287,8 @@ export const OfficialLoginFormComponent = () => {
               </div>
             )}
           </Button>
-        </form>
+          </form>
+        )}
 
         <div className="mt-6 space-y-4">
           <div className="text-center">

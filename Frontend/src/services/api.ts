@@ -2,13 +2,25 @@ import { API_CONFIG } from '@/config/api';
 
 
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   message?: string;
   error?: string;
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const getString = (record: Record<string, unknown>, key: string): string | undefined => {
+  const value = record[key];
+  return typeof value === 'string' && value.trim() ? value : undefined;
+};
+
+const extractErrorMessage = (value: unknown): string | undefined => {
+  if (!isRecord(value)) return undefined;
+  return getString(value, 'message') || getString(value, 'detail') || getString(value, 'error');
+};
 
 
 class ApiClient {
@@ -42,7 +54,7 @@ class ApiClient {
 
       clearTimeout(timeoutId);
 
-      let data: any = null;
+      let data: unknown = null;
       try {
         data = await response.json();
       } catch {
@@ -50,23 +62,40 @@ class ApiClient {
       }
 
       if (!response.ok) {
+        const extractedError = extractErrorMessage(data) || 'Request failed';
+
+        // If the stored token is no longer valid (common after backend restart when SECRET_KEY changes),
+        // clear local auth state to avoid the app getting stuck on empty pages.
+        if (response.status === 401 && token) {
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('user');
+
+          if (typeof window !== 'undefined') {
+            const loginPath = window.location.pathname.startsWith('/official') ? '/official/login' : '/login';
+            if (window.location.pathname !== loginPath) {
+              window.location.href = loginPath;
+            }
+          }
+        }
+
         return {
           success: false,
-          error: data?.message || data?.detail || data?.error || 'Request failed',
+          error: extractedError,
         };
       }
 
-      if (data?.success === false) {
+      if (isRecord(data) && data.success === false) {
         return {
           success: false,
-          error: data?.error || data?.message || 'Request failed',
+          error: extractErrorMessage(data) || 'Request failed',
         };
       }
 
+      const payload = isRecord(data) && 'data' in data ? (data as Record<string, unknown>).data : data;
       return {
         success: true,
-        data: data?.data ?? data,
-        message: data?.message,
+        data: payload as T,
+        message: isRecord(data) ? getString(data, 'message') : undefined,
       };
     } catch (error) {
       clearTimeout(timeoutId);
@@ -81,7 +110,7 @@ class ApiClient {
     return this.request<T>(endpoint, { ...options, method: 'GET' });
   }
 
-  async post<T>(endpoint: string, data?: any, options?: RequestInit): Promise<ApiResponse<T>> {
+  async post<T>(endpoint: string, data?: unknown, options?: RequestInit): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       ...options,
       method: 'POST',
@@ -89,7 +118,7 @@ class ApiClient {
     });
   }
 
-  async put<T>(endpoint: string, data?: any, options?: RequestInit): Promise<ApiResponse<T>> {
+  async put<T>(endpoint: string, data?: unknown, options?: RequestInit): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       ...options,
       method: 'PUT',
@@ -97,7 +126,7 @@ class ApiClient {
     });
   }
 
-  async patch<T>(endpoint: string, data?: any, options?: RequestInit): Promise<ApiResponse<T>> {
+  async patch<T>(endpoint: string, data?: unknown, options?: RequestInit): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       ...options,
       method: 'PATCH',
@@ -109,7 +138,7 @@ class ApiClient {
     return this.request<T>(endpoint, { ...options, method: 'DELETE' });
   }
 
-  async uploadFile<T>(endpoint: string, file: File, additionalData?: Record<string, any>): Promise<ApiResponse<T>> {
+  async uploadFile<T>(endpoint: string, file: File, additionalData?: Record<string, unknown>): Promise<ApiResponse<T>> {
     const formData = new FormData();
     formData.append('file', file);
     
@@ -130,7 +159,7 @@ class ApiClient {
         body: formData,
       });
 
-      let data: any = null;
+      let data: unknown = null;
       try {
         data = await response.json();
       } catch {
@@ -140,21 +169,22 @@ class ApiClient {
       if (!response.ok) {
         return {
           success: false,
-          error: data?.message || data?.detail || data?.error || 'Upload failed',
+          error: extractErrorMessage(data) || 'Upload failed',
         };
       }
 
-      if (data?.success === false) {
+      if (isRecord(data) && data.success === false) {
         return {
           success: false,
-          error: data?.error || data?.message || 'Upload failed',
+          error: extractErrorMessage(data) || 'Upload failed',
         };
       }
 
+      const payload = isRecord(data) && 'data' in data ? (data as Record<string, unknown>).data : data;
       return {
         success: true,
-        data: data?.data ?? data,
-        message: data?.message,
+        data: payload as T,
+        message: isRecord(data) ? getString(data, 'message') : undefined,
       };
     } catch (error) {
       return {

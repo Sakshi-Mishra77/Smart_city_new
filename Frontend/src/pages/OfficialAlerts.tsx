@@ -8,6 +8,14 @@ import { Button } from '@/components/ui/button';
 import { AlertTriangle, MapPin, Filter, Siren, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+const isCriticalPriority = (priority?: string) => priority === 'high' || priority === 'critical';
+
+const formatPriorityLabel = (priority?: string) => {
+  const value = (priority || '').trim().toLowerCase();
+  if (!value) return 'Unknown';
+  return value.charAt(0).toUpperCase() + value.slice(1);
+};
+
 export default function OfficialAlerts() {
   const { incidents, loading } = useIncidents();
   const [filter, setFilter] = useState<'all' | 'critical' | 'recent'>('all');
@@ -18,7 +26,7 @@ export default function OfficialAlerts() {
     );
 
     if (filter === 'critical') {
-      sorted = sorted.filter(i => i.priority === 'High' || i.priority === 'Critical');
+      sorted = sorted.filter((i) => isCriticalPriority(i.priority));
     }
     
     return sorted;
@@ -34,11 +42,11 @@ export default function OfficialAlerts() {
         description: i.description,
         status: i.status,
         priority: i.priority,
-        type: i.type
+        type: i.category
       }));
   }, [activeAlerts]);
 
-  const criticalCount = incidents.filter(i => i.priority === 'High' || i.priority === 'Critical').length;
+  const criticalCount = incidents.filter((i) => isCriticalPriority(i.priority)).length;
 
   return (
     <OfficialDashboardLayout>
@@ -101,7 +109,7 @@ export default function OfficialAlerts() {
                     key={alert.id} 
                     className={cn(
                       "p-4 hover:bg-muted/50 transition-colors cursor-pointer border-l-4",
-                      (alert.priority === 'High' || alert.priority === 'Critical') 
+                      isCriticalPriority(alert.priority)
                         ? "border-l-red-500 bg-red-50/10" 
                         : "border-l-transparent"
                     )}
@@ -120,13 +128,13 @@ export default function OfficialAlerts() {
                     <div className="flex items-center justify-between">
                       <div className="flex gap-2">
                         <Badge variant={
-                          alert.priority === 'High' ? 'destructive' : 
-                          alert.priority === 'Medium' ? 'secondary' : 'outline'
+                          alert.priority === 'high' || alert.priority === 'critical' ? 'destructive' : 
+                          alert.priority === 'medium' ? 'secondary' : 'outline'
                         } className="text-[10px] px-1.5 h-5">
-                          {alert.priority}
+                          {formatPriorityLabel(alert.priority)}
                         </Badge>
                         <Badge variant="outline" className="text-[10px] px-1.5 h-5 capitalize">
-                          {alert.type}
+                          {alert.category}
                         </Badge>
                       </div>
                       {alert.location && (
@@ -148,7 +156,7 @@ export default function OfficialAlerts() {
                center={{ lat: 20.5937, lng: 78.9629 }} 
                zoom={13}
                height="100%"
-               showHeatmap={false} s
+               showHeatmap={false}
              />
              <div className="absolute top-4 right-4 z-[400] bg-background/90 backdrop-blur px-4 py-2 rounded-lg border shadow-sm text-xs font-medium">
                <div className="flex gap-4">

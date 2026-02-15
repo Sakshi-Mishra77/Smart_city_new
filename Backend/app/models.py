@@ -58,6 +58,9 @@ class UserUpdate(BaseModel):
     name: str | None = None
     phone: str | None = None
     email: str | None = None
+    address: str | None = None
+    pincode: str | None = None
+    department: str | None = None
 
 class ForgotPasswordRequest(BaseModel):
     email: str | None = None
@@ -66,3 +69,18 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     password: str
+
+
+class OtpVerifyRequest(BaseModel):
+    challengeId: str
+    otp: str
+
+
+class PasswordChangeRequestOtp(BaseModel):
+    currentPassword: str
+
+
+class PasswordChangeConfirm(BaseModel):
+    challengeId: str
+    otp: str
+    newPassword: str

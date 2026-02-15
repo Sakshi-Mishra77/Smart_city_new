@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from app.database import tickets
 from app.auth import get_official_user
@@ -8,6 +9,7 @@ from app.services.notification_service import send_sms, send_whatsapp
 from app.services.email_service import send_ticket_update_email
 
 router = APIRouter(prefix="/api/tickets")
+LOGGER = logging.getLogger(__name__)
 
 def _now_iso():
     return datetime.utcnow().isoformat()
@@ -24,14 +26,22 @@ def _get_ticket_doc(ticket_id: str):
 
 def _notify_ticket_update(doc: dict):
     message = f"SafeLive ticket update: {doc.get('title', 'Ticket')} is now {doc.get('status', 'updated')}."
-    try:
-        if doc.get("reporterPhone"):
-            send_sms(doc.get("reporterPhone"), message)
-            send_whatsapp(doc.get("reporterPhone"), message)
-        if doc.get("reporterEmail"):
-            send_ticket_update_email(doc.get("reporterEmail"), doc.get("title", "Ticket"), doc.get("status", "updated"))
-    except Exception:
-        return
+    if doc.get("reporterPhone"):
+        sms_ok, sms_error = send_sms(doc.get("reporterPhone"), message)
+        if not sms_ok:
+            LOGGER.warning("SMS notification failed for ticket %s: %s", doc.get("_id"), sms_error)
+        wa_ok, wa_error = send_whatsapp(doc.get("reporterPhone"), message)
+        if not wa_ok:
+            LOGGER.warning("WhatsApp notification failed for ticket %s: %s", doc.get("_id"), wa_error)
+    if doc.get("reporterEmail"):
+        try:
+            send_ticket_update_email(
+                doc.get("reporterEmail"),
+                doc.get("title", "Ticket"),
+                doc.get("status", "updated"),
+            )
+        except Exception as exc:
+            LOGGER.warning("Email notification failed for ticket %s: %s", doc.get("_id"), exc)
 
 @router.get("/stats")
 def get_stats(current_user: dict = Depends(get_official_user)):

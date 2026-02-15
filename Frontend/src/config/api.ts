@@ -31,10 +31,17 @@ export const API_ENDPOINTS = {
   AUTH: {
     LOGIN: '/auth/login',
     REGISTER: '/auth/register',
+    VERIFY_OTP: '/auth/verify-otp',
     LOGOUT: '/auth/logout',
     FORGOT_PASSWORD: '/auth/forgot-password',
     RESET_PASSWORD: '/auth/reset-password',
     VERIFY_EMAIL: '/auth/verify-email',
+    CHANGE_PASSWORD_REQUEST_OTP: '/auth/password/change/request-otp',
+    CHANGE_PASSWORD_CONFIRM: '/auth/password/change/confirm',
+    TWO_FA_ENABLE_REQUEST_OTP: '/auth/2fa/enable/request-otp',
+    TWO_FA_ENABLE_CONFIRM: '/auth/2fa/enable/confirm',
+    TWO_FA_DISABLE_REQUEST_OTP: '/auth/2fa/disable/request-otp',
+    TWO_FA_DISABLE_CONFIRM: '/auth/2fa/disable/confirm',
   },
 
   INCIDENTS: {

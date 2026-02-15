@@ -5,8 +5,6 @@ import {
   MapPin, 
   Bell, 
   BarChart3, 
-  Shield, 
-  Zap,
   MessageSquare,
   ClipboardCheck,
   Users,
@@ -181,31 +179,6 @@ const Index = () => {
                     {(!summary?.recent || summary.recent.length === 0) && (
                       <div className="text-sm text-muted-foreground">No incidents yet</div>
                     )}
-                  </div>
-                </div>
-
-                {}
-                <div className="absolute -top-4 -right-4 bg-card rounded-xl shadow-card p-3 border border-border animate-float">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center">
-                      <Shield className="h-4 w-4 text-success" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-medium text-foreground">98% Resolved</div>
-                      <div className="text-xs text-muted-foreground">This month</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="absolute -bottom-4 -left-4 bg-card rounded-xl shadow-card p-3 border border-border animate-float" style={{ animationDelay: '1s' }}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Bell className="h-4 w-4 text-primary" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-medium text-foreground">Quick Alerts</div>
-                      <div className="text-xs text-muted-foreground">Instant notifications</div>
-                    </div>
                   </div>
                 </div>
               </div>

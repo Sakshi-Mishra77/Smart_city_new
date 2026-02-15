@@ -41,7 +41,12 @@ export const ForgotPasswordForm = () => {
     setIsSubmitting(true);
     
     try {
-      const response = await authService.forgotPassword(data as any);
+      const payload =
+        method === 'email'
+          ? { email: (data as ForgotPasswordEmailData).email }
+          : { phone: (data as ForgotPasswordPhoneData).phone };
+
+      const response = await authService.forgotPassword(payload);
       if (response.success) {
         const message = response.data?.message || (method === 'email' 
           ? "Check your email for the password reset link" 
