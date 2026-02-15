@@ -35,18 +35,15 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     
     db_user = None
     if user_id:
-        # Try to find user by string ID first (for seeded users)
         db_user = users.find_one({"_id": user_id})
-        
-        # If not found, try to find by ObjectId (for registered users)
+
         if not db_user:
             try:
                 from bson import ObjectId
                 db_user = users.find_one({"_id": ObjectId(user_id)})
             except Exception:
                 pass
-    
-    # If still not found, try by email
+
     if not db_user and email:
         db_user = users.find_one({"email": email})
     

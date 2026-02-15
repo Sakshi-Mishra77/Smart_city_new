@@ -1,15 +1,33 @@
-const defaultApiBaseUrl = import.meta.env.DEV ? '/api' : 'http://127.0.0.1:8000/api';
+const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, '');
+
+const defaultApiBaseUrl = '/api';
+const resolvedApiBaseUrl = normalizeBaseUrl(import.meta.env.VITE_API_URL || defaultApiBaseUrl);
+
+const toWebSocketBaseUrl = (apiBaseUrl: string): string => {
+  const explicitWsUrl = (import.meta.env.VITE_WS_URL || '').trim();
+  if (explicitWsUrl) {
+    return normalizeBaseUrl(explicitWsUrl);
+  }
+
+  if (apiBaseUrl.startsWith('http://') || apiBaseUrl.startsWith('https://')) {
+    return normalizeBaseUrl(apiBaseUrl.replace(/^http/, 'ws').replace(/\/api\/?$/, ''));
+  }
+
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    return `${protocol}://${window.location.host}`;
+  }
+
+  return '';
+};
 
 export const API_CONFIG = {
-  BASE_URL: import.meta.env.VITE_API_URL || defaultApiBaseUrl,
+  BASE_URL: resolvedApiBaseUrl,
+  WS_BASE_URL: toWebSocketBaseUrl(resolvedApiBaseUrl),
   TIMEOUT: Number(import.meta.env.VITE_API_TIMEOUT) || 30000,
 };
 
-
-
 export const API_ENDPOINTS = {
-  
-
   AUTH: {
     LOGIN: '/auth/login',
     REGISTER: '/auth/register',
@@ -18,8 +36,6 @@ export const API_ENDPOINTS = {
     RESET_PASSWORD: '/auth/reset-password',
     VERIFY_EMAIL: '/auth/verify-email',
   },
-  
-  
 
   INCIDENTS: {
     LIST: '/issues',
@@ -30,8 +46,6 @@ export const API_ENDPOINTS = {
     DELETE: (id: string) => `/issues/${id}`,
     STATS: '/issues/stats',
   },
-  
-  
 
   TICKETS: {
     LIST: '/tickets',
@@ -40,22 +54,16 @@ export const API_ENDPOINTS = {
     ASSIGN: (id: string) => `/tickets/${id}/assign`,
     STATS: '/tickets/stats',
   },
-  
-  
 
   MESSAGES: {
     LIST: (incidentId: string) => `/incidents/${incidentId}/messages`,
     SEND: (incidentId: string) => `/incidents/${incidentId}/messages`,
   },
-  
-  
 
   USERS: {
     PROFILE: '/users/profile',
     UPDATE_PROFILE: '/users/profile',
   },
-  
-  
 
   ANALYTICS: {
     DASHBOARD: '/analytics/dashboard',

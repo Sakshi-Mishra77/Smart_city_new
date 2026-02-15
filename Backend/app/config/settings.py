@@ -1,4 +1,5 @@
 import os
+import secrets
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -10,6 +11,16 @@ def _split_env_list(value: str | None) -> list[str]:
         return []
     return [item.strip() for item in value.split(",") if item.strip()]
 
+
+def _resolve_secret_key() -> str:
+    value = os.getenv("SECRET_KEY")
+    if value:
+        return value
+    if os.getenv("ENV", "development").lower() == "production":
+        raise RuntimeError("SECRET_KEY is required in production")
+    return secrets.token_urlsafe(48)
+
+
 class Settings:
     ENV = os.getenv("ENV", "development")
     PROJECT_NAME = os.getenv("PROJECT_NAME", "SafeLive")
@@ -17,7 +28,7 @@ class Settings:
     MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
     DB_NAME = os.getenv("DB_NAME", "safelive")
 
-    SECRET_KEY = os.getenv("SECRET_KEY", "SAFELIVE_SECRET_2026")
+    SECRET_KEY = _resolve_secret_key()
     ALGORITHM = os.getenv("ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
     PASSWORD_RESET_EXPIRE_MINUTES = int(os.getenv("PASSWORD_RESET_EXPIRE_MINUTES", "30"))
@@ -48,7 +59,5 @@ class Settings:
 settings = Settings()
 
 if settings.ENV.lower() == "production":
-    if not os.getenv("SECRET_KEY"):
-        raise RuntimeError("SECRET_KEY is required in production")
     if not os.getenv("EMAIL_PASS"):
         raise RuntimeError("EMAIL_PASS is required in production")

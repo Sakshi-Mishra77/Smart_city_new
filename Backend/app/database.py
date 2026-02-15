@@ -1,3 +1,4 @@
+import atexit
 from pymongo import MongoClient
 from app.config.settings import settings
 
@@ -10,6 +11,8 @@ tickets = db["tickets"]
 messages = db["messages"]
 password_resets = db["password_resets"]
 issues_collection = incidents
+
+atexit.register(client.close)
 
 def init_db():
     from pymongo.errors import OperationFailure

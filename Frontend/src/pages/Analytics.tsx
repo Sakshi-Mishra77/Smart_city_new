@@ -1,39 +1,84 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { OfficialDashboardLayout } from '@/components/layout/OfficialDashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { analyticsService, AnalyticsData } from '@/services/analytics';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, LineChart, Line, Legend 
+import { useAnalyticsDashboard, useTrends } from '@/hooks/use-data';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+  Legend,
 } from 'recharts';
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+const COLORS = ['#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#8b5cf6'];
+
+const DAYS_BY_RANGE: Record<string, number> = {
+  '7d': 7,
+  '14d': 14,
+  '30d': 30,
+};
 
 export default function Analytics() {
-  const [data, setData] = useState<AnalyticsData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState('7d');
+  const [timeRange, setTimeRange] = useState('14d');
+  const days = DAYS_BY_RANGE[timeRange] || 14;
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        const result = await analyticsService.getAnalyticsData(timeRange);
-        setData(result);
-      } catch (error) {
-        console.error("Failed to load analytics", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, [timeRange]);
+  const {
+    data: dashboard,
+    loading: dashboardLoading,
+    error: dashboardError,
+  } = useAnalyticsDashboard();
+  const { data: trends, loading: trendsLoading, error: trendsError } = useTrends(days);
 
-  if (loading || !data) {
+  const statusComparison = useMemo(() => {
+    if (!dashboard) return [];
+    return [
+      { name: 'Open', incidents: dashboard.incidents.open, tickets: dashboard.tickets.open },
+      {
+        name: 'In Progress',
+        incidents: dashboard.incidents.inProgress,
+        tickets: dashboard.tickets.inProgress,
+      },
+      { name: 'Resolved', incidents: dashboard.incidents.resolved, tickets: dashboard.tickets.resolved },
+    ];
+  }, [dashboard]);
+
+  const trendData = useMemo(
+    () =>
+      trends.map((item) => ({
+        ...item,
+        label: item.date.slice(5),
+      })),
+    [trends]
+  );
+
+  const categoryData = dashboard?.byCategory || [];
+  const workerData = (dashboard?.workerProductivity || []).slice(0, 8);
+  const loading = dashboardLoading || trendsLoading;
+  const error = dashboardError || trendsError;
+
+  if (loading) {
     return (
       <OfficialDashboardLayout>
-        <div className="flex h-[80vh] items-center justify-center">Loading Analytics...</div>
+        <div className="flex h-[80vh] items-center justify-center">Loading analytics...</div>
+      </OfficialDashboardLayout>
+    );
+  }
+
+  if (!dashboard || error) {
+    return (
+      <OfficialDashboardLayout>
+        <div className="flex h-[80vh] items-center justify-center text-destructive">
+          {error || 'Unable to load analytics.'}
+        </div>
       </OfficialDashboardLayout>
     );
   }
@@ -44,37 +89,63 @@ export default function Analytics() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Analytics Overview</h1>
-            <p className="text-muted-foreground">Deep dive into city operational metrics.</p>
+            <p className="text-muted-foreground">Real-time operational insights from production data.</p>
           </div>
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select period" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="24h">Last 24 Hours</SelectItem>
               <SelectItem value="7d">Last 7 Days</SelectItem>
+              <SelectItem value="14d">Last 14 Days</SelectItem>
               <SelectItem value="30d">Last 30 Days</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        {/* Top Row: Activity & Resolution */}
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground">Incidents</CardTitle>
+            </CardHeader>
+            <CardContent className="text-2xl font-semibold">{dashboard.incidents.total}</CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground">Tickets</CardTitle>
+            </CardHeader>
+            <CardContent className="text-2xl font-semibold">{dashboard.tickets.total}</CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground">City Cleanliness Score</CardTitle>
+            </CardHeader>
+            <CardContent className="text-2xl font-semibold">{dashboard.cityCleanlinessScore}%</CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground">Safety Index</CardTitle>
+            </CardHeader>
+            <CardContent className="text-2xl font-semibold">{dashboard.safetyIndex}</CardContent>
+          </Card>
+        </div>
+
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Weekly Activity</CardTitle>
+              <CardTitle>Incident vs Ticket Status</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.weeklyActivity}>
+                  <BarChart data={statusComparison}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="incidents" fill="#3b82f6" name="New Incidents" />
-                    <Bar dataKey="tickets" fill="#10b981" name="Resolved Tickets" />
+                    <Bar dataKey="incidents" fill="#3b82f6" name="Incidents" />
+                    <Bar dataKey="tickets" fill="#10b981" name="Tickets" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -83,17 +154,19 @@ export default function Analytics() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Avg Resolution Time (Hours)</CardTitle>
+              <CardTitle>Created vs Resolved Trend</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data.resolutionTime}>
+                  <LineChart data={trendData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
+                    <XAxis dataKey="label" />
                     <YAxis />
                     <Tooltip />
-                    <Line type="monotone" dataKey="time" stroke="#f59e0b" strokeWidth={2} />
+                    <Legend />
+                    <Line type="monotone" dataKey="created" stroke="#f59e0b" strokeWidth={2} name="Created" />
+                    <Line type="monotone" dataKey="resolved" stroke="#10b981" strokeWidth={2} name="Resolved" />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -101,54 +174,53 @@ export default function Analytics() {
           </Card>
         </div>
 
-        {/* Bottom Row: Distribution */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Card className="lg:col-span-1">
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
             <CardHeader>
-              <CardTitle>Incidents by Type</CardTitle>
+              <CardTitle>Incidents by Category</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={data.incidentsByType}
+                      data={categoryData}
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
+                      outerRadius={90}
+                      paddingAngle={3}
+                      dataKey="count"
+                      nameKey="category"
                     >
-                      {data.incidentsByType.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      {categoryData.map((entry, index) => (
+                        <Cell key={`category-${entry.category}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip />
-                    <Legend verticalAlign="bottom" height={36}/>
+                    <Legend verticalAlign="bottom" height={36} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-2">
+          <Card>
             <CardHeader>
-              <CardTitle>Zone Wise Distribution</CardTitle>
+              <CardTitle>Worker Productivity</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.incidentsByZone} layout="vertical">
+                  <BarChart data={workerData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={100} />
+                    <XAxis dataKey="worker" tick={{ fontSize: 11 }} />
+                    <YAxis />
                     <Tooltip />
-                    <Bar dataKey="value" fill="#8884d8" barSize={30}>
-                      {data.incidentsByZone.map((entry, index) => (
-                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Bar>
+                    <Legend />
+                    <Bar dataKey="resolved" fill="#22c55e" name="Resolved" />
+                    <Bar dataKey="open" fill="#ef4444" name="Open" />
+                    <Bar dataKey="inProgress" fill="#f59e0b" name="In Progress" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
