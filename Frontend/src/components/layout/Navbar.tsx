@@ -51,7 +51,7 @@ export const Navbar = () => {
                   <div className="absolute right-0 mt-2 w-56 bg-card rounded-xl shadow-card border border-border z-50 overflow-hidden animate-scale-in">
                     <div className="py-2">
                       <Link 
-                        to="/login?type=local"
+                        to="/login"
                         className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted transition-colors"
                         onClick={() => setIsLoginDropdownOpen(false)}
                       >
@@ -59,12 +59,12 @@ export const Navbar = () => {
                           <span className="text-primary text-xs font-semibold">L</span>
                         </div>
                         <div>
-                          <div className="font-medium text-foreground">Local User</div>
+                          <div className="font-medium text-foreground">Local Login</div>
                           <div className="text-xs text-muted-foreground">Report & track incidents</div>
                         </div>
                       </Link>
                       <Link 
-                        to="/login?type=official"
+                        to="/official/login"
                         className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted transition-colors"
                         onClick={() => setIsLoginDropdownOpen(false)}
                       >
@@ -72,7 +72,7 @@ export const Navbar = () => {
                           <span className="text-accent text-xs font-semibold">O</span>
                         </div>
                         <div>
-                          <div className="font-medium text-foreground">Official</div>
+                          <div className="font-medium text-foreground">Official Login</div>
                           <div className="text-xs text-muted-foreground">Admin & department access</div>
                         </div>
                       </Link>

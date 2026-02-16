@@ -117,7 +117,7 @@ const Index = () => {
                 </Link>
                 <Link to="/login">
                   <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                    Local User Login
+                    Local Login
                   </Button>
                 </Link>
                 <Link to="/official/login">

@@ -158,7 +158,7 @@ export const LoginForm = () => {
         {}
         <div className="text-center mb-8">
           <h1 className="text-2xl font-heading font-bold text-foreground mb-2">
-            Local User Login
+            Local Login
           </h1>
           <p className="text-muted-foreground">
             Report and track incidents in SafeLive
