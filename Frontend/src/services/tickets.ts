@@ -13,6 +13,9 @@ export interface Ticket {
   longitude?: number;
   reportedBy: string;
   assignedTo?: string;
+  assigneeName?: string;
+  assigneePhone?: string;
+  assigneePhotoUrl?: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -32,7 +35,10 @@ export interface UpdateStatusData {
 }
 
 export interface AssignTicketData {
-  assignedTo: string;
+  assignedTo?: string;
+  assigneeName?: string;
+  assigneePhone?: string;
+  assigneePhoto?: string;
   notes?: string;
 }
 

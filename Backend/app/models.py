@@ -49,7 +49,10 @@ class TicketUpdateStatus(BaseModel):
     notes: str | None = None
 
 class TicketAssign(BaseModel):
-    assignedTo: str
+    assignedTo: str | None = None
+    assigneeName: str | None = None
+    assigneePhone: str | None = None
+    assigneePhoto: str | None = None
     notes: str | None = None
 
 class MessageCreate(BaseModel):

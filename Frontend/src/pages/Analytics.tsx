@@ -41,13 +41,9 @@ export default function Analytics() {
   const statusComparison = useMemo(() => {
     if (!dashboard) return [];
     return [
-      { name: 'Open', incidents: dashboard.incidents.open, tickets: dashboard.tickets.open },
-      {
-        name: 'In Progress',
-        incidents: dashboard.incidents.inProgress,
-        tickets: dashboard.tickets.inProgress,
-      },
-      { name: 'Resolved', incidents: dashboard.incidents.resolved, tickets: dashboard.tickets.resolved },
+      { name: 'Open', count: dashboard.tickets.open, color: '#3b82f6' },
+      { name: 'In Progress', count: dashboard.tickets.inProgress, color: '#f59e0b' },
+      { name: 'Resolved', count: dashboard.tickets.resolved, color: '#10b981' },
     ];
   }, [dashboard]);
 
@@ -127,7 +123,7 @@ export default function Analytics() {
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Incident vs Ticket Status</CardTitle>
+              <CardTitle>Ticket Status Overview</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[300px] w-full">
@@ -137,9 +133,11 @@ export default function Analytics() {
                     <XAxis dataKey="name" />
                     <YAxis />
                     <Tooltip />
-                    <Legend />
-                    <Bar dataKey="incidents" fill="#3b82f6" name="Incidents" />
-                    <Bar dataKey="tickets" fill="#10b981" name="Tickets" />
+                    <Bar dataKey="count" name="Tickets">
+                      {statusComparison.map((entry) => (
+                        <Cell key={`status-${entry.name}`} fill={entry.color} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>

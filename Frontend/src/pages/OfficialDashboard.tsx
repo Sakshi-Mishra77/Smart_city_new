@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
-import { CheckCircle2, ClipboardList, Clock, Filter, AlertCircle, Users } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Clock, Filter, AlertCircle, Users, RotateCcw } from 'lucide-react';
 import { OfficialDashboardLayout } from '@/components/layout/OfficialDashboardLayout';
 import { SettingsModal } from '@/components/SettingsModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAnalyticsDashboard, useTickets, useTrends } from '@/hooks/use-data';
-import { ticketService } from '@/services/tickets';
+import { ticketService, Ticket } from '@/services/tickets';
 import { useToast } from '@/hooks/use-toast';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend } from 'recharts';
 import { cn } from '@/lib/utils';
 import { useLocation } from 'react-router-dom';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const statusBadge: Record<string, string> = {
   open: 'badge-info',
@@ -18,15 +19,26 @@ const statusBadge: Record<string, string> = {
   verified: 'badge-success'
 };
 
+interface AssignmentDraft {
+  name: string;
+  phone: string;
+  photoBase64: string;
+  photoName: string;
+}
+
 const OfficialDashboard = () => {
   const { pathname } = useLocation();
   const { toast } = useToast();
   const [showSettings, setShowSettings] = useState(false);
+  const [incidentDialogOpen, setIncidentDialogOpen] = useState(false);
+  const [incidentImageDialogOpen, setIncidentImageDialogOpen] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [query, setQuery] = useState('');
-  const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
-  const [assignee, setAssignee] = useState('');
-  const [status, setStatus] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, AssignmentDraft>>({});
+  const [assigneeEditorOpen, setAssigneeEditorOpen] = useState<Record<string, boolean>>({});
+  const [statusDrafts, setStatusDrafts] = useState<Record<string, string>>({});
+  const [submittingAssignId, setSubmittingAssignId] = useState<string | null>(null);
+  const [submittingStatusId, setSubmittingStatusId] = useState<string | null>(null);
 
   const { tickets, loading: ticketsLoading, error: ticketsError, refetch: refetchTickets } = useTickets();
   const { data: analytics, loading: analyticsLoading, error: analyticsError, refetch: refetchAnalytics } = useAnalyticsDashboard();
@@ -36,13 +48,67 @@ const OfficialDashboard = () => {
     const term = query.trim().toLowerCase();
     if (!term) return tickets;
     return tickets.filter((t) =>
-      [t.title, t.description, t.category, t.location, t.status, t.assignedTo]
+      [t.title, t.description, t.category, t.location, t.status, t.assignedTo, t.assigneeName, t.assigneePhone]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
         .includes(term)
     );
   }, [tickets, query]);
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = typeof reader.result === 'string' ? reader.result : '';
+        const parts = result.split(',');
+        const base64 = parts.length > 1 ? parts[1] : '';
+        if (!base64) {
+          reject(new Error('Invalid image'));
+          return;
+        }
+        resolve(base64);
+      };
+      reader.onerror = () => reject(new Error('Unable to read image'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const getAssignmentDraft = (ticketId: string, fallbackName = '', fallbackPhone = ''): AssignmentDraft => {
+    return assignmentDrafts[ticketId] || {
+      name: fallbackName,
+      phone: fallbackPhone,
+      photoBase64: '',
+      photoName: '',
+    };
+  };
+
+  const setAssignmentDraft = (ticketId: string, updates: Partial<AssignmentDraft>, fallbackName = '', fallbackPhone = '') => {
+    setAssignmentDrafts((prev) => {
+      const current = prev[ticketId] || {
+        name: fallbackName,
+        phone: fallbackPhone,
+        photoBase64: '',
+        photoName: '',
+      };
+      return {
+        ...prev,
+        [ticketId]: {
+          ...current,
+          ...updates,
+        },
+      };
+    });
+  };
+
+  const openAssigneeEditor = (ticketId: string, fallbackName = '', fallbackPhone = '') => {
+    setAssignmentDraft(ticketId, {}, fallbackName, fallbackPhone);
+    setAssigneeEditorOpen((prev) => ({ ...prev, [ticketId]: true }));
+  };
+
+  const closeAssigneeEditor = (ticketId: string) => {
+    setAssigneeEditorOpen((prev) => ({ ...prev, [ticketId]: false }));
+  };
 
   const stats = useMemo(() => {
     const total = analytics?.tickets.total || tickets.length;
@@ -60,47 +126,103 @@ const OfficialDashboard = () => {
     return 'overview';
   }, [pathname]);
 
-  const handleAssign = async (ticketId: string) => {
-    if (!assignee.trim()) {
-      toast({ title: 'Assignee Required', description: 'Enter an assignee name', variant: 'destructive' });
+  const handleAssigneePhoto = async (ticketId: string, file: File | null, fallbackName = '', fallbackPhone = '') => {
+    if (!file) return;
+    try {
+      const base64 = await fileToBase64(file);
+      setAssignmentDraft(ticketId, { photoBase64: base64, photoName: file.name }, fallbackName, fallbackPhone);
+    } catch {
+      toast({ title: 'Invalid Photo', description: 'Upload a valid image file', variant: 'destructive' });
+    }
+  };
+
+  const handleAssign = async (ticketId: string, fallbackName = '', fallbackPhone = '', hasExistingPhoto = false) => {
+    const draft = getAssignmentDraft(ticketId, fallbackName, fallbackPhone);
+    const name = draft.name.trim();
+    const phoneDigits = draft.phone.replace(/\D/g, '');
+
+    if (!name) {
+      toast({ title: 'Name Required', description: 'Enter personnel name', variant: 'destructive' });
       return;
     }
-    setSubmitting(true);
+    if (phoneDigits.length < 10 || phoneDigits.length > 15) {
+      toast({ title: 'Phone Required', description: 'Enter a valid phone number', variant: 'destructive' });
+      return;
+    }
+    if (!draft.photoBase64 && !hasExistingPhoto) {
+      toast({ title: 'Photo Required', description: 'Upload personnel photo', variant: 'destructive' });
+      return;
+    }
+
+    setSubmittingAssignId(ticketId);
     try {
-      const response = await ticketService.assignTicket(ticketId, { assignedTo: assignee.trim() });
+      const response = await ticketService.assignTicket(ticketId, {
+        assigneeName: name,
+        assigneePhone: phoneDigits,
+        assignedTo: name,
+        assigneePhoto: draft.photoBase64 || undefined,
+      });
       if (response.success) {
-        toast({ title: 'Ticket Assigned', description: 'Assignment updated' });
-        setAssignee('');
+        const updated = response.data;
+        toast({
+          title: fallbackName ? 'Personnel Changed' : 'Ticket Assigned',
+          description: 'Assignment updated successfully',
+        });
+        setAssignmentDraft(ticketId, {
+          name: updated?.assigneeName || updated?.assignedTo || name,
+          phone: updated?.assigneePhone || phoneDigits,
+          photoBase64: '',
+          photoName: '',
+        });
+        closeAssigneeEditor(ticketId);
         await refetchTickets();
         await refetchAnalytics();
       } else {
         toast({ title: 'Assign Failed', description: response.error || 'Unable to assign', variant: 'destructive' });
       }
     } finally {
-      setSubmitting(false);
+      setSubmittingAssignId(null);
     }
   };
 
-  const handleStatus = async (ticketId: string) => {
-    if (!status) {
+  const handleStatus = async (ticketId: string, nextStatus?: string) => {
+    const targetStatus = nextStatus || statusDrafts[ticketId] || '';
+    if (!targetStatus) {
       toast({ title: 'Status Required', description: 'Select a status', variant: 'destructive' });
       return;
     }
-    setSubmitting(true);
+    setSubmittingStatusId(ticketId);
     try {
-      const response = await ticketService.updateStatus(ticketId, { status });
+      const response = await ticketService.updateStatus(ticketId, { status: targetStatus });
       if (response.success) {
-        toast({ title: 'Status Updated', description: 'Ticket status updated' });
-        setStatus('');
+        const finalStatus = response.data?.status || targetStatus;
+        toast({
+          title: finalStatus === 'open' ? 'Ticket Reopened' : 'Status Updated',
+          description:
+            targetStatus === 'verified'
+              ? 'Verified ticket moved to IN_PROGRESS'
+              : finalStatus === 'open'
+                ? 'Ticket moved back to OPEN'
+                : 'Ticket status updated',
+        });
+        setStatusDrafts((prev) => ({ ...prev, [ticketId]: '' }));
         await refetchTickets();
         await refetchAnalytics();
       } else {
         toast({ title: 'Update Failed', description: response.error || 'Unable to update status', variant: 'destructive' });
       }
     } finally {
-      setSubmitting(false);
+      setSubmittingStatusId(null);
     }
   };
+
+  const openIncidentDetails = (ticket: Ticket) => {
+    setSelectedTicket(ticket);
+    setIncidentImageDialogOpen(false);
+    setIncidentDialogOpen(true);
+  };
+
+  const formatStatus = (value: string) => value.replace('_', ' ').toUpperCase();
 
   return (
     <>
@@ -224,83 +346,290 @@ const OfficialDashboard = () => {
               {!ticketsLoading && filteredTickets.length === 0 && <div className="text-sm text-muted-foreground">No tickets found</div>}
 
               <div className="space-y-3">
-                {filteredTickets.map((ticket) => (
-                  <div key={ticket.id} className="p-4 rounded-xl border border-border">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-foreground">{ticket.title}</span>
-                          <span className={cn("px-2 py-0.5 text-xs font-medium rounded-full border", statusBadge[ticket.status] || 'badge-info')}>
-                            {ticket.status}
-                          </span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">{ticket.category} | {ticket.priority} priority</div>
-                        <div className="text-xs text-muted-foreground">{ticket.location}</div>
-                        <div className="text-xs text-muted-foreground">Assigned: {ticket.assignedTo || 'Unassigned'}</div>
-                      </div>
-                      <div>
-                        {ticket.status === 'resolved' ? (
-                          <CheckCircle2 className="h-5 w-5 text-success" />
-                        ) : ticket.status === 'in_progress' ? (
-                          <Clock className="h-5 w-5 text-warning" />
-                        ) : (
-                          <AlertCircle className="h-5 w-5 text-info" />
-                        )}
-                      </div>
-                    </div>
+                {filteredTickets.map((ticket) => {
+                  const existingName = ticket.assigneeName || ticket.assignedTo || '';
+                  const existingPhone = ticket.assigneePhone || '';
+                  const assignmentDraft = getAssignmentDraft(ticket.id, existingName, existingPhone);
+                  const isResolved = ticket.status === 'resolved';
+                  const hasAssignee = !!existingName;
+                  const isEditingAssignee = !!assigneeEditorOpen[ticket.id];
 
-                    <div className="grid sm:grid-cols-2 gap-3 mt-3">
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Assign worker"
-                          value={activeTicketId === ticket.id ? assignee : ''}
-                          onFocus={() => setActiveTicketId(ticket.id)}
-                          onChange={(e) => {
-                            setActiveTicketId(ticket.id);
-                            setAssignee(e.target.value);
-                          }}
-                        />
-                        <Button
-                          variant="outline"
-                          onClick={() => handleAssign(ticket.id)}
-                          disabled={submitting}
-                        >
-                          <Users className="h-4 w-4 mr-1" />
-                          Assign
-                        </Button>
+                  return (
+                    <div key={ticket.id} className="p-4 rounded-xl border border-border">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-foreground">{ticket.title}</span>
+                            <span className={cn("px-2 py-0.5 text-xs font-medium rounded-full border", statusBadge[ticket.status] || 'badge-info')}>
+                              {ticket.status}
+                            </span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">{ticket.category} | {ticket.priority} priority</div>
+                          <div className="text-xs text-muted-foreground">{ticket.location}</div>
+                          <div className="text-xs text-muted-foreground">
+                            Assigned: {existingName || 'Unassigned'}{existingPhone ? ` (${existingPhone})` : ''}
+                          </div>
+                        </div>
+                        <div className="shrink-0">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-8 px-3 text-xs"
+                            onClick={() => openIncidentDetails(ticket)}
+                          >
+                            Show Incident
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <select
-                          className="h-10 px-3 rounded-md border border-input bg-background text-sm w-full"
-                          value={activeTicketId === ticket.id ? status : ''}
-                          onFocus={() => setActiveTicketId(ticket.id)}
-                          onChange={(e) => {
-                            setActiveTicketId(ticket.id);
-                            setStatus(e.target.value);
-                          }}
-                        >
-                          <option value="">Set status</option>
-                          <option value="open">OPEN</option>
-                          <option value="in_progress">IN_PROGRESS</option>
-                          <option value="resolved">RESOLVED</option>
-                          <option value="verified">VERIFIED</option>
-                        </select>
-                        <Button
-                          onClick={() => handleStatus(ticket.id)}
-                          disabled={submitting}
-                        >
-                          <ClipboardList className="h-4 w-4 mr-1" />
-                          Update
-                        </Button>
-                      </div>
+
+                      {isResolved ? (
+                        <div className="mt-3 flex items-center justify-between gap-2 rounded-md border border-border p-2">
+                          <span className="text-sm text-muted-foreground">Resolved ticket. Use reopen if needed.</span>
+                          <Button
+                            variant="outline"
+                            onClick={() => handleStatus(ticket.id, 'open')}
+                            disabled={submittingStatusId === ticket.id}
+                          >
+                            <RotateCcw className="h-4 w-4 mr-1" />
+                            Reopen
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="grid lg:grid-cols-2 gap-3 mt-3">
+                          <div className="space-y-2">
+                            {!isEditingAssignee ? (
+                              <>
+                                <div className="rounded-md border border-border p-2">
+                                  {hasAssignee ? (
+                                    <div className="text-sm text-foreground">
+                                      <span className="font-medium">{existingName}</span>
+                                      {existingPhone ? ` | ${existingPhone}` : ''}
+                                    </div>
+                                  ) : (
+                                    <div className="text-sm text-muted-foreground">No personnel assigned yet.</div>
+                                  )}
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  onClick={() => openAssigneeEditor(ticket.id, existingName, existingPhone)}
+                                  disabled={submittingAssignId === ticket.id}
+                                >
+                                  <Users className="h-4 w-4 mr-1" />
+                                  {hasAssignee ? 'Change Personnel' : 'Assign Personnel'}
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <div className="grid sm:grid-cols-3 gap-2">
+                                  <Input
+                                    placeholder="Personnel name"
+                                    value={assignmentDraft.name}
+                                    onChange={(e) => setAssignmentDraft(ticket.id, { name: e.target.value }, existingName, existingPhone)}
+                                  />
+                                  <Input
+                                    placeholder="Phone number"
+                                    value={assignmentDraft.phone}
+                                    inputMode="numeric"
+                                    onChange={(e) => setAssignmentDraft(ticket.id, { phone: e.target.value }, existingName, existingPhone)}
+                                  />
+                                  <Input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => handleAssigneePhoto(ticket.id, e.target.files?.[0] || null, existingName, existingPhone)}
+                                  />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => handleAssign(ticket.id, existingName, existingPhone, !!ticket.assigneePhotoUrl)}
+                                    disabled={submittingAssignId === ticket.id}
+                                  >
+                                    <Users className="h-4 w-4 mr-1" />
+                                    {hasAssignee ? 'Save Personnel' : 'Assign Personnel'}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() => closeAssigneeEditor(ticket.id)}
+                                    disabled={submittingAssignId === ticket.id}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  {assignmentDraft.photoName && (
+                                    <span className="text-xs text-muted-foreground truncate">{assignmentDraft.photoName}</span>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
+
+                          <div className="flex gap-2">
+                            <select
+                              className="h-10 px-3 rounded-md border border-input bg-background text-sm w-full"
+                              value={statusDrafts[ticket.id] || ''}
+                              disabled={!hasAssignee || submittingStatusId === ticket.id}
+                              onChange={(e) => {
+                                setStatusDrafts((prev) => ({ ...prev, [ticket.id]: e.target.value }));
+                              }}
+                            >
+                              <option value="">Set status</option>
+                              <option value="verified">VERIFIED</option>
+                              <option value="resolved">RESOLVED</option>
+                            </select>
+                            <Button
+                              onClick={() => handleStatus(ticket.id)}
+                              disabled={submittingStatusId === ticket.id || !hasAssignee}
+                            >
+                              <ClipboardList className="h-4 w-4 mr-1" />
+                              Update
+                            </Button>
+                          </div>
+                          {!hasAssignee && (
+                            <p className="text-xs text-muted-foreground">Assign personnel first to update status.</p>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
         </div>
       </OfficialDashboardLayout>
+      <Dialog
+        open={incidentDialogOpen}
+        onOpenChange={(open) => {
+          setIncidentDialogOpen(open);
+          if (!open) {
+            setIncidentImageDialogOpen(false);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Incident Details</DialogTitle>
+            <DialogDescription>
+              Full report information for review and action.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedTicket && (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border p-3">
+                <div className="text-xs text-muted-foreground mb-2">Incident Image</div>
+                {selectedTicket.assigneePhotoUrl ? (
+                  <button
+                    type="button"
+                    className="w-full text-left"
+                    onClick={() => setIncidentImageDialogOpen(true)}
+                  >
+                    <img
+                      src={selectedTicket.assigneePhotoUrl}
+                      alt={selectedTicket.assigneeName || selectedTicket.assignedTo || 'Incident image'}
+                      className="w-full h-44 rounded-md object-cover border border-border"
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">Click image to view larger</p>
+                  </button>
+                ) : (
+                  <div className="h-28 rounded-md border border-dashed border-border bg-muted/40 flex items-center justify-center text-sm text-muted-foreground">
+                    No image available
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-border p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-lg font-semibold text-foreground">{selectedTicket.title}</h3>
+                  <span className={cn("px-2 py-0.5 text-xs font-medium rounded-full border", statusBadge[selectedTicket.status] || 'badge-info')}>
+                    {formatStatus(selectedTicket.status)}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {selectedTicket.description || 'No description provided.'}
+                </p>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="rounded-lg border border-border p-3">
+                  <div className="text-xs text-muted-foreground mb-1">Incident ID</div>
+                  <div className="text-sm font-medium text-foreground">{selectedTicket.id}</div>
+                </div>
+                <div className="rounded-lg border border-border p-3">
+                  <div className="text-xs text-muted-foreground mb-1">Category</div>
+                  <div className="text-sm font-medium text-foreground">{selectedTicket.category}</div>
+                </div>
+                <div className="rounded-lg border border-border p-3">
+                  <div className="text-xs text-muted-foreground mb-1">Priority</div>
+                  <div className="text-sm font-medium text-foreground">{selectedTicket.priority?.toUpperCase() || 'N/A'}</div>
+                </div>
+                <div className="rounded-lg border border-border p-3">
+                  <div className="text-xs text-muted-foreground mb-1">Reported By</div>
+                  <div className="text-sm font-medium text-foreground">{selectedTicket.reportedBy || 'Unknown'}</div>
+                </div>
+                <div className="rounded-lg border border-border p-3 sm:col-span-2">
+                  <div className="text-xs text-muted-foreground mb-1">Location</div>
+                  <div className="text-sm font-medium text-foreground">{selectedTicket.location || 'N/A'}</div>
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="rounded-lg border border-border p-3">
+                  <div className="text-xs text-muted-foreground mb-1">Assigned Personnel</div>
+                  <div className="text-sm font-medium text-foreground">
+                    {selectedTicket.assigneeName || selectedTicket.assignedTo || 'Unassigned'}
+                  </div>
+                  {selectedTicket.assigneePhone && (
+                    <div className="text-xs text-muted-foreground mt-1">{selectedTicket.assigneePhone}</div>
+                  )}
+                </div>
+                <div className="rounded-lg border border-border p-3">
+                  <div className="text-xs text-muted-foreground mb-1">Incident Status</div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      {selectedTicket.status === 'resolved' ? (
+                        <CheckCircle2 className="h-5 w-5 text-success" />
+                      ) : selectedTicket.status === 'in_progress' ? (
+                        <Clock className="h-5 w-5 text-warning" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-info" />
+                      )}
+                      <span className="text-foreground font-medium">{formatStatus(selectedTicket.status)}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border p-3">
+                  <div className="text-xs text-muted-foreground mb-1">Timeline</div>
+                  <div className="text-xs text-muted-foreground">
+                    Created: {selectedTicket.createdAt ? new Date(selectedTicket.createdAt).toLocaleString() : 'N/A'}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Updated: {selectedTicket.updatedAt ? new Date(selectedTicket.updatedAt).toLocaleString() : 'N/A'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={incidentImageDialogOpen} onOpenChange={setIncidentImageDialogOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Incident Image</DialogTitle>
+            <DialogDescription>Expanded view</DialogDescription>
+          </DialogHeader>
+          {selectedTicket?.assigneePhotoUrl ? (
+            <img
+              src={selectedTicket.assigneePhotoUrl}
+              alt={selectedTicket.assigneeName || selectedTicket.assignedTo || 'Incident image'}
+              className="w-full max-h-[70vh] object-contain rounded-md border border-border"
+            />
+          ) : (
+            <div className="h-40 rounded-md border border-dashed border-border bg-muted/40 flex items-center justify-center text-sm text-muted-foreground">
+              No image available
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

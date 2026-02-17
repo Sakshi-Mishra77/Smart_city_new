@@ -15,7 +15,6 @@ import {
   User,
   Bell,
   Building2,
-  FileText 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -32,7 +31,6 @@ const navItems = [
   { icon: Home, label: 'Overview', path: '/official/dashboard' },
   { icon: MapPin, label: 'Live Map', path: '/official/map' },
   { icon: BarChart3, label: 'Analytics', path: '/official/analytics' }, 
-  { icon: FileText, label: 'Reports', path: '/official/reports' },      
   { icon: ClipboardList, label: 'All Tickets', path: '/official/tickets' },
   { icon: Users, label: 'Personnel', path: '/official/personnel' },
   { icon: Bell, label: 'Alerts', path: '/official/alerts' },

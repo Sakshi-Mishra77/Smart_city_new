@@ -31,3 +31,6 @@ dist-ssr
 *.sw?
 __pycache__/
 *.pyc
+Backend/images/*.jpg
+Backend/images/*.jpeg
+Backend/images/*.png

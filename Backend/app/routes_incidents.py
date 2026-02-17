@@ -2,11 +2,11 @@ import os
 import logging
 from datetime import datetime
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from app.database import incidents, messages, tickets
+from app.database import incidents, messages, tickets, users
 from app.models import IncidentCreate, IncidentUpdate, MessageCreate
 from app.services.ws_manager import manager
 from app.services.image_service import save_image
-from app.services.email_service import send_alert_email, send_incident_submission_email
+from app.services.email_service import send_alert_email, send_incident_submission_email, send_ticket_update_email
 from app.services.notification_service import send_stakeholder_notifications
 from app.issue_model import IssueIn
 from app.auth import get_current_user, get_official_user
@@ -64,6 +64,41 @@ def _notify_new_issue(description: str, lat: float | None, lon: float | None):
         send_stakeholder_notifications(text)
     except Exception as exc:
         LOGGER.warning("Stakeholder notification failed: %s", exc)
+
+def _normalize_incident_status(value: str | None) -> str | None:
+    if value is None:
+        return None
+    status = value.strip().lower()
+    if status == "verified":
+        return "in_progress"
+    return status
+
+def _resolve_reporter_email(
+    reporter_email: str | None,
+    reporter_id: str | None,
+    reporter_phone: str | None,
+) -> str | None:
+    email_value = (reporter_email or "").strip()
+    if email_value and "@" in email_value:
+        return email_value
+
+    if reporter_id:
+        user_doc = None
+        try:
+            user_doc = users.find_one({"_id": to_object_id(reporter_id)}, {"email": 1})
+        except Exception:
+            user_doc = users.find_one({"_id": reporter_id}, {"email": 1})
+        fallback_email = (user_doc or {}).get("email")
+        if fallback_email and "@" in fallback_email:
+            return fallback_email.strip()
+
+    if reporter_phone:
+        user_doc = users.find_one({"phone": reporter_phone}, {"email": 1})
+        fallback_email = (user_doc or {}).get("email")
+        if fallback_email and "@" in fallback_email:
+            return fallback_email.strip()
+
+    return None
 
 def _send_incident_submission_email_safe(
     to_email: str,
@@ -173,7 +208,12 @@ async def create_incident(
     if current_user:
         data["reportedBy"] = current_user.get("name") or current_user.get("email") or current_user.get("phone")
         data["reporterId"] = current_user.get("id")
-        data["reporterEmail"] = current_user.get("email")
+        reporter_email = _resolve_reporter_email(
+            current_user.get("email"),
+            current_user.get("id"),
+            current_user.get("phone"),
+        )
+        data["reporterEmail"] = reporter_email
         data["reporterPhone"] = current_user.get("phone")
     result = incidents.insert_one(data)
     doc = incidents.find_one({"_id": result.inserted_id})
@@ -182,7 +222,11 @@ async def create_incident(
         incidents.update_one({"_id": result.inserted_id}, {"$set": {"ticketId": str(ticket_id)}})
         doc = incidents.find_one({"_id": result.inserted_id})
     payload = serialize_doc(doc)
-    reporter_email = payload.get("reporterEmail")
+    reporter_email = _resolve_reporter_email(
+        payload.get("reporterEmail"),
+        payload.get("reporterId"),
+        payload.get("reporterPhone"),
+    )
     if reporter_email and not _is_official(current_user):
         background_tasks.add_task(
             _send_incident_submission_email_safe,
@@ -195,6 +239,8 @@ async def create_incident(
             payload.get("location") or "",
             payload.get("createdAt") or now,
         )
+    elif not _is_official(current_user):
+        LOGGER.warning("Incident submission email skipped: reporter email unavailable for incident %s", payload.get("id"))
     _notify_new_issue(payload.get("description", ""), payload.get("latitude"), payload.get("longitude"))
     await manager.broadcast({
         "type": "NEW_INCIDENT",
@@ -252,6 +298,11 @@ async def report_issue(issue: IssueIn):
 def update_incident(incident_id: str, incident: IncidentUpdate, current_user: dict = Depends(get_official_user)):
     _ = _get_incident_doc(incident_id)
     updates = incident.dict(exclude_unset=True, exclude_none=True)
+    if "status" in updates:
+        normalized_status = _normalize_incident_status(updates.get("status"))
+        if normalized_status not in {"open", "in_progress", "resolved"}:
+            raise HTTPException(status_code=400, detail="Invalid status")
+        updates["status"] = normalized_status
     images = updates.pop("images", None)
     if images is not None:
         image_urls = _save_images(images)
@@ -270,6 +321,22 @@ def update_incident(incident_id: str, incident: IncidentUpdate, current_user: di
         if ticket_updates:
             ticket_updates["updatedAt"] = doc.get("updatedAt")
             tickets.update_one({"incidentId": str(doc.get("_id"))}, {"$set": ticket_updates})
+        resolved_email = _resolve_reporter_email(
+            doc.get("reporterEmail"),
+            doc.get("reporterId"),
+            doc.get("reporterPhone"),
+        )
+        if updates.get("status") == "resolved" and resolved_email:
+            try:
+                send_ticket_update_email(
+                    resolved_email,
+                    doc.get("title", "Ticket"),
+                    "resolved",
+                )
+            except Exception as exc:
+                LOGGER.warning("Resolved notification email failed for incident %s: %s", incident_id, exc)
+        elif updates.get("status") == "resolved":
+            LOGGER.warning("Resolved notification email skipped: reporter email unavailable for incident %s", incident_id)
     return {"success": True, "data": serialize_doc(doc)}
 
 @router.delete("/incidents/{incident_id}")
