@@ -2,6 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { OfficialDashboardLayout } from '@/components/layout/OfficialDashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Download, Filter, RefreshCw } from 'lucide-react';
 import { incidentService, Incident } from '@/services/incidents';
@@ -21,10 +30,22 @@ const PRIORITY_COLORS: Record<string, string> = {
   low: 'text-slate-500',
 };
 
+const STATUS_FILTER_OPTIONS: Incident['status'][] = [
+  'open',
+  'in_progress',
+  'resolved',
+  'verified',
+  'rejected',
+];
+
+const PRIORITY_FILTER_OPTIONS: NonNullable<Incident['priority']>[] = ['critical', 'high', 'medium', 'low'];
+
 export default function Reports() {
   const [reports, setReports] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | Incident['status']>('all');
+  const [priorityFilter, setPriorityFilter] = useState<'all' | NonNullable<Incident['priority']>>('all');
 
   const fetchReports = async () => {
     setLoading(true);
@@ -42,8 +63,16 @@ export default function Reports() {
     fetchReports();
   }, []);
 
+  const filteredReports = useMemo(() => {
+    return reports.filter((incident) => {
+      const matchesStatus = statusFilter === 'all' || incident.status === statusFilter;
+      const matchesPriority = priorityFilter === 'all' || incident.priority === priorityFilter;
+      return matchesStatus && matchesPriority;
+    });
+  }, [reports, statusFilter, priorityFilter]);
+
   const summary = useMemo(() => {
-    return reports.reduce(
+    return filteredReports.reduce(
       (acc, incident) => {
         acc.total += 1;
         acc.byStatus[incident.status] = (acc.byStatus[incident.status] || 0) + 1;
@@ -51,10 +80,12 @@ export default function Reports() {
       },
       { total: 0, byStatus: {} as Record<string, number> }
     );
-  }, [reports]);
+  }, [filteredReports]);
+
+  const activeFilterCount = Number(statusFilter !== 'all') + Number(priorityFilter !== 'all');
 
   const downloadCSV = () => {
-    if (!reports.length) return;
+    if (!filteredReports.length) return;
     const headers = [
       'Incident ID',
       'Title',
@@ -70,7 +101,7 @@ export default function Reports() {
 
     const csvContent = [
       headers.join(','),
-      ...reports.map((incident) => (
+      ...filteredReports.map((incident) => (
         [
           incident.id,
           incident.title,
@@ -99,6 +130,11 @@ export default function Reports() {
     document.body.removeChild(link);
   };
 
+  const clearFilters = () => {
+    setStatusFilter('all');
+    setPriorityFilter('all');
+  };
+
   return (
     <OfficialDashboardLayout>
       <div className="space-y-6 animate-fade-in">
@@ -111,10 +147,44 @@ export default function Reports() {
             <Button variant="outline" onClick={fetchReports} disabled={loading}>
               <RefreshCw className={cn('mr-2 h-4 w-4', loading && 'animate-spin')} /> Refresh
             </Button>
-            <Button variant="outline">
-              <Filter className="mr-2 h-4 w-4" /> Filter
-            </Button>
-            <Button onClick={downloadCSV} disabled={!reports.length}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Filter className="mr-2 h-4 w-4" />
+                  Filter{activeFilterCount ? ` (${activeFilterCount})` : ''}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Status</DropdownMenuLabel>
+                {STATUS_FILTER_OPTIONS.map((status) => (
+                  <DropdownMenuCheckboxItem
+                    key={status}
+                    checked={statusFilter === status}
+                    onCheckedChange={() => {
+                      setStatusFilter((current) => (current === status ? 'all' : status));
+                    }}
+                  >
+                    {status.replace('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase())}
+                  </DropdownMenuCheckboxItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Priority</DropdownMenuLabel>
+                {PRIORITY_FILTER_OPTIONS.map((priority) => (
+                  <DropdownMenuCheckboxItem
+                    key={priority}
+                    checked={priorityFilter === priority}
+                    onCheckedChange={() => {
+                      setPriorityFilter((current) => (current === priority ? 'all' : priority));
+                    }}
+                  >
+                    {priority.toUpperCase()}
+                  </DropdownMenuCheckboxItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={clearFilters}>Clear Filters</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button onClick={downloadCSV} disabled={!filteredReports.length}>
               <Download className="mr-2 h-4 w-4" /> Export CSV
             </Button>
           </div>
@@ -174,15 +244,17 @@ export default function Reports() {
                     </TableRow>
                   )}
 
-                  {!loading && !error && !reports.length && (
+                  {!loading && !error && !filteredReports.length && (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center text-muted-foreground">
-                        No citizen reports have been submitted yet.
+                        {reports.length
+                          ? 'No reports match the selected filters.'
+                          : 'No citizen reports have been submitted yet.'}
                       </TableCell>
                     </TableRow>
                   )}
 
-                  {!loading && !error && reports.map((incident) => (
+                  {!loading && !error && filteredReports.map((incident) => (
                     <TableRow key={incident.id}>
                       <TableCell className="font-medium">
                         <div className="flex flex-col">
