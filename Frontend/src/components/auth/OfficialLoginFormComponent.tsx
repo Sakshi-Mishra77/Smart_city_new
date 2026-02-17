@@ -55,7 +55,8 @@ export const OfficialLoginFormComponent = () => {
     try {
       const response = await authService.login({
         email: data.email,
-        password: data.password
+        password: data.password,
+        expectedUserType: 'official',
       });
       const result = response.data;
       if (response.success && isOtpChallenge(result) && result.requiresOtp) {

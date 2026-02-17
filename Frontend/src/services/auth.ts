@@ -5,6 +5,7 @@ export interface LoginData {
   email?: string;
   phone?: string;
   password: string;
+  expectedUserType?: 'citizen' | 'official';
 }
 
 export interface RegisterData {

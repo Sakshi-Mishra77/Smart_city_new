@@ -13,6 +13,7 @@ class LoginModel(BaseModel):
     email: str | None = None
     phone: str | None = None
     password: str
+    expectedUserType: str | None = None
 
 class IncidentCreate(BaseModel):
     title: str

@@ -29,6 +29,14 @@ from app.utils import serialize_doc
 router = APIRouter(prefix="/api/auth")
 LOGGER = logging.getLogger(__name__)
 
+def _normalize_user_type(value: str | None) -> str:
+    raw = (value or "").strip().lower()
+    if raw in {"local", "citizen"}:
+        return "citizen"
+    if raw == "official":
+        return "official"
+    return raw
+
 
 def _raise_otp_http(exc: Exception) -> None:
     message = str(exc) or "OTP error"
@@ -95,6 +103,13 @@ def login(user: LoginModel):
     db_user = users.find_one(query)
     if not db_user or not verify_password(user.password, db_user["password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    expected_user_type = _normalize_user_type(user.expectedUserType)
+    actual_user_type = _normalize_user_type(db_user.get("userType"))
+    if expected_user_type in {"citizen", "official"} and actual_user_type != expected_user_type:
+        if expected_user_type == "citizen":
+            raise HTTPException(status_code=403, detail="Use official login for official accounts")
+        raise HTTPException(status_code=403, detail="Use local login for citizen accounts")
 
     if bool(db_user.get("twoFactorEnabled")):
         try:

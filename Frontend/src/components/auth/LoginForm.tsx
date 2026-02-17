@@ -62,8 +62,8 @@ export const LoginForm = () => {
     
     try {
       const loginData = loginMethod === 'email' 
-        ? { email: (data as EmailLoginFormData).email, password: data.password }
-        : { phone: (data as PhoneLoginFormData).phone, password: data.password };
+        ? { email: (data as EmailLoginFormData).email, password: data.password, expectedUserType: 'citizen' as const }
+        : { phone: (data as PhoneLoginFormData).phone, password: data.password, expectedUserType: 'citizen' as const };
 
       const response = await authService.login(loginData);
       
@@ -81,17 +81,23 @@ export const LoginForm = () => {
           return;
         }
 
+        if (isAuthResponse(result) && result.user.userType !== 'citizen') {
+          toast({
+            title: "Access Denied",
+            description: "Official accounts must use Official Login.",
+            variant: "destructive",
+          });
+          await authService.logout();
+          return;
+        }
+
         toast({
           title: "Login Successful!",
           description: "Welcome back! Redirecting to your dashboard...",
         });
 
         setTimeout(() => {
-          if (isAuthResponse(result) && result.user.userType === 'official') {
-            navigate('/official/dashboard');
-          } else {
-            navigate('/dashboard');
-          }
+          navigate('/dashboard');
         }, 1000);
       } else {
         toast({
@@ -127,6 +133,17 @@ export const LoginForm = () => {
     try {
       const response = await authService.verifyOtp(otpChallengeId, trimmed);
       if (response.success && response.data?.token) {
+        if (response.data.user.userType !== 'citizen') {
+          toast({
+            title: "Access Denied",
+            description: "Official accounts must use Official Login.",
+            variant: "destructive",
+          });
+          setOtpChallengeId(null);
+          setOtpValue('');
+          await authService.logout();
+          return;
+        }
         toast({
           title: "Verification Successful",
           description: "Redirecting to your dashboard...",
@@ -134,11 +151,7 @@ export const LoginForm = () => {
         setOtpChallengeId(null);
         setOtpValue('');
         setTimeout(() => {
-          if (response.data?.user.userType === 'official') {
-            navigate('/official/dashboard');
-          } else {
-            navigate('/dashboard');
-          }
+          navigate('/dashboard');
         }, 700);
         return;
       }

@@ -17,12 +17,20 @@ export const Captcha = ({ value, onChange, onValidChange, error }: CaptchaProps)
   const [operation, setOperation] = useState('+');
   const [isValid, setIsValid] = useState<boolean | null>(null);
 
-  const operations = ['+', '-', '*'];
-
   const generateNewCaptcha = useCallback(() => {
-    setNum1(Math.floor(Math.random() * 10) + 1);
-    setNum2(Math.floor(Math.random() * 10) + 1);
-    setOperation(operations[Math.floor(Math.random() * operations.length)]);
+    const operations = ['+', '-', '*'];
+    const nextOperation = operations[Math.floor(Math.random() * operations.length)];
+    let nextNum1 = Math.floor(Math.random() * 10) + 1;
+    let nextNum2 = Math.floor(Math.random() * 10) + 1;
+
+    // Keep subtraction non-negative so answers stay compatible with numeric-only input.
+    if (nextOperation === '-' && nextNum1 < nextNum2) {
+      [nextNum1, nextNum2] = [nextNum2, nextNum1];
+    }
+
+    setNum1(nextNum1);
+    setNum2(nextNum2);
+    setOperation(nextOperation);
     onChange('');
     setIsValid(null);
   }, [onChange]);
