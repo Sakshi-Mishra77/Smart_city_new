@@ -11,6 +11,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, L
 import { cn } from '@/lib/utils';
 import { useLocation } from 'react-router-dom';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { authService } from '@/services/auth';
 
 const statusBadge: Record<string, string> = {
   open: 'badge-info',
@@ -28,6 +29,11 @@ interface AssignmentDraft {
 
 const OfficialDashboard = () => {
   const { pathname } = useLocation();
+  const user = authService.getCurrentUser();
+  const isHeadSupervisor = user?.userType === 'head_supervisor';
+  const normalizedPath = pathname.startsWith('/official/supervisor')
+    ? pathname.replace('/official/supervisor', '/official')
+    : pathname;
   const { toast } = useToast();
   const [showSettings, setShowSettings] = useState(false);
   const [incidentDialogOpen, setIncidentDialogOpen] = useState(false);
@@ -119,12 +125,12 @@ const OfficialDashboard = () => {
   }, [analytics, tickets]);
 
   const currentSection = useMemo(() => {
-    if (pathname.includes('/official/tickets')) return 'tickets';
-    if (pathname.includes('/official/personnel')) return 'personnel';
-    if (pathname.includes('/official/analytics')) return 'analytics';
-    if (pathname.includes('/official/alerts')) return 'alerts';
+    if (normalizedPath.includes('/official/tickets')) return 'tickets';
+    if (normalizedPath.includes('/official/personnel')) return 'personnel';
+    if (normalizedPath.includes('/official/analytics')) return 'analytics';
+    if (normalizedPath.includes('/official/alerts')) return 'alerts';
     return 'overview';
-  }, [pathname]);
+  }, [normalizedPath]);
 
   const handleAssigneePhoto = async (ticketId: string, file: File | null, fallbackName = '', fallbackPhone = '') => {
     if (!file) return;
@@ -231,8 +237,14 @@ const OfficialDashboard = () => {
         <div className="space-y-6 animate-fade-in">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-heading font-bold text-foreground">Official Dashboard</h1>
-              <p className="text-muted-foreground">Live operations for tickets, analytics, and personnel</p>
+              <h1 className="text-2xl font-heading font-bold text-foreground">
+                {isHeadSupervisor ? 'Head Supervisor Command Center' : 'Department Official Console'}
+              </h1>
+              <p className="text-muted-foreground">
+                {isHeadSupervisor
+                  ? 'Coordinate cross-departmental operations, analytics, and staffing in real time.'
+                  : 'Track assigned incidents, update progress, and collaborate with your supervisor team.'}
+              </p>
             </div>
           </div>
 

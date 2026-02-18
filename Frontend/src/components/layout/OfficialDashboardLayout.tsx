@@ -27,15 +27,6 @@ interface OfficialDashboardLayoutProps {
 }
 
 
-const navItems = [
-  { icon: Home, label: 'Overview', path: '/official/dashboard' },
-  { icon: MapPin, label: 'Live Map', path: '/official/map' },
-  { icon: BarChart3, label: 'Analytics', path: '/official/analytics' }, 
-  { icon: ClipboardList, label: 'All Tickets', path: '/official/tickets' },
-  { icon: Users, label: 'Personnel', path: '/official/personnel' },
-  { icon: Bell, label: 'Alerts', path: '/official/alerts' },
-];
-
 export const OfficialDashboardLayout = ({ children, onSettingsClick }: OfficialDashboardLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -43,12 +34,25 @@ export const OfficialDashboardLayout = ({ children, onSettingsClick }: OfficialD
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const user = authService.getCurrentUser();
-  const userName = user?.name || user?.email || 'Official';
-  const userDept = user?.department || 'Operations';
+  const userRole = user?.userType === 'head_supervisor' ? 'head_supervisor' : 'official';
+  const isHeadSupervisor = userRole === 'head_supervisor';
+  const basePath = isHeadSupervisor ? '/official/supervisor' : '/official';
+  const userName = user?.fullName || user?.name || user?.email || 'Official';
+  const userDept = user?.department || (isHeadSupervisor ? 'City Command' : 'Operations');
+  const roleBadgeLabel = isHeadSupervisor ? 'Head Supervisor Portal' : 'Department Official Portal';
+  const navItems = [
+    { icon: Home, label: isHeadSupervisor ? 'Command HQ' : 'Overview', slug: '/dashboard' },
+    { icon: MapPin, label: 'Live Map', slug: '/map' },
+    { icon: BarChart3, label: 'Analytics', slug: '/analytics', roles: ['head_supervisor'] }, 
+    { icon: ClipboardList, label: isHeadSupervisor ? 'All Tickets' : 'My Tickets', slug: '/tickets' },
+    { icon: Users, label: 'Personnel', slug: '/personnel', roles: ['head_supervisor'] },
+    { icon: Bell, label: 'Alerts', slug: '/alerts' },
+  ].filter((item) => !item.roles || item.roles?.includes(userRole as 'official' | 'head_supervisor'));
+  const headerNav = navItems.find((item) => location.pathname.startsWith(`${basePath}${item.slug}`));
 
   const handleLogout = async () => {
     await authService.logout();
-    navigate('/login'); 
+    navigate('/official/login'); 
   };
 
   const handleSettingsClick = () => {
@@ -71,7 +75,7 @@ export const OfficialDashboardLayout = ({ children, onSettingsClick }: OfficialD
           <Menu className="h-6 w-6" />
         </button>
         
-        <Link to="/official/dashboard" className="flex items-center gap-2 mx-auto text-white">
+        <Link to={`${basePath}/dashboard`} className="flex items-center gap-2 mx-auto text-white">
           <div className="p-1.5 rounded-lg bg-white/10">
             <Shield className="h-5 w-5" />
           </div>
@@ -100,7 +104,7 @@ export const OfficialDashboardLayout = ({ children, onSettingsClick }: OfficialD
       )}>
         <div className="flex flex-col h-full">
           <div className="p-4 flex items-center justify-between border-b border-white/10">
-            <Link to="/official/dashboard" className="flex items-center gap-2">
+            <Link to={`${basePath}/dashboard`} className="flex items-center gap-2">
               <div className="p-2 rounded-xl bg-white/10">
                 <Shield className="h-6 w-6" />
               </div>
@@ -119,11 +123,12 @@ export const OfficialDashboardLayout = ({ children, onSettingsClick }: OfficialD
 
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
             {navItems.map((item) => {
-              const isActive = location.pathname === item.path;
+              const targetPath = `${basePath}${item.slug}`;
+              const isActive = location.pathname.startsWith(targetPath);
               return (
                 <Link
-                  key={item.path}
-                  to={item.path}
+                  key={item.slug}
+                  to={targetPath}
                   onClick={() => setIsSidebarOpen(false)}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
@@ -177,10 +182,10 @@ export const OfficialDashboardLayout = ({ children, onSettingsClick }: OfficialD
         <header className="hidden lg:flex items-center justify-between h-16 px-6 bg-card border-b border-border">
           <div className="flex items-center gap-4">
             <h1 className="text-lg font-heading font-semibold text-foreground">
-              {navItems.find(item => item.path === location.pathname)?.label || 'Dashboard'}
+              {headerNav?.label || (isHeadSupervisor ? 'Command HQ' : 'Dashboard')}
             </h1>
             <span className="px-2 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full">
-              Official Portal
+              {roleBadgeLabel}
             </span>
           </div>
 

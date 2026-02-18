@@ -8,6 +8,23 @@ from app.database import users
 from app.utils import serialize_doc
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+OFFICIAL_ROLES = {"official", "head_supervisor"}
+
+
+def _normalize_role(value: str | None) -> str:
+    return (value or "").strip().lower()
+
+
+def is_official_account(user: dict | None) -> bool:
+    if not isinstance(user, dict):
+        return False
+    return _normalize_role(user.get("userType")) in OFFICIAL_ROLES
+
+
+def is_head_supervisor_account(user: dict | None) -> bool:
+    if not isinstance(user, dict):
+        return False
+    return _normalize_role(user.get("userType")) == "head_supervisor"
 
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
@@ -59,6 +76,12 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     return data
 
 def get_official_user(current_user: dict = Depends(get_current_user)):
-    if current_user.get("userType") != "official":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Official access required")
+    if not is_official_account(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Official or head supervisor access required")
+    return current_user
+
+
+def get_head_supervisor_user(current_user: dict = Depends(get_current_user)):
+    if not is_head_supervisor_account(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Head supervisor access required")
     return current_user

@@ -5,7 +5,7 @@ export interface LoginData {
   email?: string;
   phone?: string;
   password: string;
-  expectedUserType?: 'citizen' | 'official';
+  expectedUserType?: 'citizen' | 'official' | 'head_supervisor';
 }
 
 export interface RegisterData {
@@ -13,7 +13,7 @@ export interface RegisterData {
   email?: string;
   phone?: string;
   password: string;
-  userType: 'citizen' | 'official';
+  userType: 'citizen' | 'official' | 'head_supervisor';
   address?: string;
   pincode?: string;
 }
@@ -23,9 +23,10 @@ export interface AuthResponse {
   user: {
     id: string;
     name: string;
+    fullName?: string;
     email?: string;
     phone?: string;
-    userType: 'citizen' | 'official';
+    userType: 'citizen' | 'official' | 'head_supervisor';
     address?: string;
     pincode?: string;
     department?: string;

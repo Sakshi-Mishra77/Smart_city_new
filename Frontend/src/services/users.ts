@@ -6,7 +6,7 @@ export interface UserProfile {
   name: string;
   email?: string;
   phone?: string;
-  userType: 'citizen' | 'official';
+  userType: 'citizen' | 'official' | 'head_supervisor';
   address?: string;
   pincode?: string;
   department?: string;

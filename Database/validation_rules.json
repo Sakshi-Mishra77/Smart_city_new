@@ -23,7 +23,7 @@
             "description": "Hashed password - required"
           },
           "userType": {
-            "enum": ["citizen", "official", "admin"],
+            "enum": ["citizen", "official", "head_supervisor", "admin"],
             "description": "Type of user - required"
           },
           "department": {

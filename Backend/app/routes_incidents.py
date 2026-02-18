@@ -9,7 +9,7 @@ from app.services.image_service import save_image
 from app.services.email_service import send_alert_email, send_incident_submission_email, send_ticket_update_email
 from app.services.notification_service import send_stakeholder_notifications
 from app.issue_model import IssueIn
-from app.auth import get_current_user, get_official_user
+from app.auth import get_current_user, get_official_user, is_official_account
 from app.utils import serialize_doc, serialize_list, to_object_id
 
 router = APIRouter(prefix="/api")
@@ -44,7 +44,7 @@ def _get_incident_doc(incident_id: str):
     return doc
 
 def _is_official(user: dict):
-    return user.get("userType") == "official"
+    return is_official_account(user)
 
 def _can_access_incident(doc: dict, user: dict):
     if _is_official(user):

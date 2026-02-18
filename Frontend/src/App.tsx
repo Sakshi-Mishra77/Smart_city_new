@@ -57,6 +57,17 @@ const App = () => (
             <Route path="/official/settings" element={<OfficialDashboard />} />
           </Route>
 
+          <Route element={<RouteGuard role="head_supervisor" />}>
+            <Route path="/official/supervisor/dashboard" element={<OfficialDashboard />} />
+            <Route path="/official/supervisor/tickets" element={<OfficialDashboard />} />
+            <Route path="/official/supervisor/map" element={<OfficialMap />} />
+            <Route path="/official/supervisor/personnel" element={<OfficialDashboard />} />
+            <Route path="/official/supervisor/analytics" element={<Analytics />} />
+            <Route path="/official/supervisor/reports" element={<Reports />} />
+            <Route path="/official/supervisor/alerts" element={<OfficialAlerts />} />
+            <Route path="/official/supervisor/settings" element={<OfficialDashboard />} />
+          </Route>
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

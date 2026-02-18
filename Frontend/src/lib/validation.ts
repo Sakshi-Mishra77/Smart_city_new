@@ -59,7 +59,7 @@ export const registrationSchema = z.object({
   confirmPassword: z.string(),
   address: z.string().trim().min(10, { message: "Please enter a complete address" }).max(500),
   pincode: z.string().regex(/^\d{6}$/, { message: "Please enter a valid 6-digit pincode" }),
-  userType: z.enum(['local', 'official'], { required_error: "Please select user type" }),
+  userType: z.enum(['local', 'official', 'head_supervisor'], { required_error: "Please select user type" }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],
