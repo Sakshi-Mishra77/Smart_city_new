@@ -44,8 +44,8 @@ const App = () => (
           </Route>
 
           <Route element={<RouteGuard role="official" />}>
-            <Route path="/official/dashboard" element={<OfficialDashboard mode="overview" />} />
-            <Route path="/official/tickets" element={<OfficialDashboard mode="tickets" />} />
+            <Route path="/official/dashboard" element={<OfficialDashboard />} />
+            <Route path="/official/tickets" element={<OfficialDashboard />} />
             <Route path="/official/map" element={<OfficialMap />} />
             
             <Route path="/official/analytics" element={<Analytics />} />
@@ -53,18 +53,7 @@ const App = () => (
             <Route path="/official/reports" element={<Reports />} />
             
             <Route path="/official/alerts" element={<OfficialAlerts />} />
-            <Route path="/official/settings" element={<OfficialDashboard mode="overview" />} />
-          </Route>
-
-          <Route element={<RouteGuard role="head_supervisor" />}>
-            <Route path="/official/supervisor/dashboard" element={<OfficialDashboard />} />
-            <Route path="/official/supervisor/tickets" element={<OfficialDashboard />} />
-            <Route path="/official/supervisor/map" element={<OfficialMap />} />
-            <Route path="/official/supervisor/personnel" element={<OfficialDashboard />} />
-            <Route path="/official/supervisor/analytics" element={<Analytics />} />
-            <Route path="/official/supervisor/reports" element={<Reports />} />
-            <Route path="/official/supervisor/alerts" element={<OfficialAlerts />} />
-            <Route path="/official/supervisor/settings" element={<OfficialDashboard />} />
+            <Route path="/official/settings" element={<OfficialDashboard />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

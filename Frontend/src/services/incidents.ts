@@ -6,7 +6,7 @@ export interface Incident {
   title: string;
   description?: string;
   category: string;
-  status: 'open' | 'in_progress' | 'resolved' | 'verified' | 'rejected';
+  status: 'open' | 'pending' | 'in_progress' | 'resolved' | 'verified' | 'rejected';
   priority?: 'low' | 'medium' | 'high' | 'critical';
   location: string;
   latitude?: number;

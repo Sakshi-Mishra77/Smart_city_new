@@ -21,6 +21,8 @@ def _normalize_status(value: str | None) -> str:
     status = (value or "").strip().lower()
     if status == "verified":
         return "in_progress"
+    if status in {"pending", "pending_review", "under_review"}:
+        return "open"
     return status
 
 
@@ -126,7 +128,7 @@ def _sync_incident_progress(ticket_doc: dict, percent: int, source: str, confide
 
 
 def run_auto_progress_pass() -> None:
-    query = {"status": {"$in": ["open", "in_progress", "resolved", "verified"]}}
+    query = {"status": {"$in": ["open", "pending", "in_progress", "resolved", "verified"]}}
     cursor = tickets.find(query)
     for doc in cursor:
         percent, confidence, source = _estimate_ticket_progress(doc)

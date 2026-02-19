@@ -22,6 +22,15 @@ export interface UserProfileUpdate {
   department?: string;
 }
 
+export interface WorkerAccount {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  officialRole: 'worker';
+  workerSpecialization?: string;
+}
+
 export const usersService = {
   async getProfile(): Promise<ApiResponse<UserProfile>> {
     return apiClient.get<UserProfile>(API_ENDPOINTS.USERS.PROFILE);
@@ -29,6 +38,10 @@ export const usersService = {
 
   async updateProfile(payload: UserProfileUpdate): Promise<ApiResponse<UserProfile>> {
     return apiClient.put<UserProfile>(API_ENDPOINTS.USERS.UPDATE_PROFILE, payload);
+  },
+
+  async listWorkers(): Promise<ApiResponse<WorkerAccount[]>> {
+    return apiClient.get<WorkerAccount[]>(API_ENDPOINTS.USERS.WORKERS);
   },
 };
 

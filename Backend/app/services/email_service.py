@@ -142,7 +142,12 @@ def send_email(subject: str, to_email: str, text_body: str, html_body: str | Non
     raise EmailDeliveryError(error_message)
 
 
-def _render_email_frame(title: str, intro: str, details: list[tuple[str, str]]) -> str:
+def _render_email_frame(
+    title: str,
+    intro: str,
+    details: list[tuple[str, str]],
+    extra_html: str | None = None,
+) -> str:
     row_html = []
     for label, value in details:
         value_text = value or "N/A"
@@ -170,7 +175,8 @@ def _render_email_frame(title: str, intro: str, details: list[tuple[str, str]]) 
         f"<p style='margin:0 0 14px 0'>{escape(intro)}</p>"
         "<table width='100%' cellpadding='0' cellspacing='0' "
         "style='border:1px solid #edf1f7;border-radius:6px'>"
-        f"{rows}</table></td></tr>"
+        f"{rows}</table>"
+        f"{extra_html or ''}</td></tr>"
         "<tr><td style='padding:14px 24px;background:#f8faff;color:#6d7a89;font-size:12px'>"
         "SafeLive notification service</td></tr>"
         "</table></td></tr></table></body></html>"
@@ -322,4 +328,72 @@ def send_field_inspector_reminder_email(
         "Please submit the update before 6:00 PM IST."
     )
     html_body = _render_email_frame(title=subject, intro=intro, details=details)
+    return send_email(subject=subject, to_email=to_email, text_body=text_body, html_body=html_body)
+
+
+def send_critical_incident_review_email(
+    *,
+    to_email: str,
+    reviewer_name: str,
+    incident_id: str,
+    title: str,
+    category: str,
+    location: str,
+    priority: str,
+    created_at: str,
+    approve_url: str,
+    reject_url: str,
+    extra_details: list[tuple[str, str]] | None = None,
+    image_urls: list[str] | None = None,
+) -> EmailDeliveryResult:
+    subject = "SafeLive Critical Incident Review Required"
+    reviewer = (reviewer_name or "Reviewer").strip()
+    intro = (
+        f"Hi {reviewer}, a critical incident was flagged by AI and requires your email decision. "
+        "Use one of the actions below."
+    )
+    details = [
+        ("Incident ID", incident_id or "N/A"),
+        ("Title", title or "N/A"),
+        ("Category", category or "N/A"),
+        ("Priority", (priority or "critical").upper()),
+        ("Location", location or "N/A"),
+        ("Reported At", created_at or "N/A"),
+    ]
+    for label, value in (extra_details or []):
+        if not str(label or "").strip():
+            continue
+        details.append((str(label), str(value or "N/A")))
+
+    for idx, url in enumerate(image_urls or []):
+        safe_url = str(url or "").strip()
+        if not safe_url:
+            continue
+        details.append((f"Image {idx + 1}", safe_url))
+
+    safe_approve = escape(approve_url)
+    safe_reject = escape(reject_url)
+    actions_html = (
+        "<div style='margin-top:16px'>"
+        f"<a href='{safe_approve}' "
+        "style='display:inline-block;margin-right:10px;padding:10px 14px;border-radius:6px;"
+        "background:#1f7a1f;color:#ffffff;text-decoration:none;font-weight:600'>Approve</a>"
+        f"<a href='{safe_reject}' "
+        "style='display:inline-block;padding:10px 14px;border-radius:6px;"
+        "background:#b42318;color:#ffffff;text-decoration:none;font-weight:600'>Reject</a>"
+        "</div>"
+        "<p style='margin:10px 0 0 0;color:#5b6775;font-size:12px'>"
+        "This action link is secure and tied to this incident review request."
+        "</p>"
+    )
+
+    detail_lines = "\n".join(f"{label}: {value}" for label, value in details)
+    text_body = (
+        f"Hi {reviewer},\n\n"
+        "A critical incident requires your decision.\n\n"
+        f"{detail_lines}\n\n"
+        f"Approve: {approve_url}\n"
+        f"Reject: {reject_url}\n"
+    )
+    html_body = _render_email_frame(title=subject, intro=intro, details=details, extra_html=actions_html)
     return send_email(subject=subject, to_email=to_email, text_body=text_body, html_body=html_body)

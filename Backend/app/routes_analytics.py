@@ -45,11 +45,13 @@ def _safe_float(value):
 def _status_breakdown(collection):
     total = collection.count_documents({})
     open_count = collection.count_documents({"status": "open"})
-    in_progress_count = collection.count_documents({"status": "in_progress"})
+    pending_count = collection.count_documents({"status": "pending"})
+    in_progress_count = collection.count_documents({"status": {"$in": ["in_progress", "verified"]}})
     resolved_count = collection.count_documents({"status": "resolved"})
     return {
         "total": total,
         "open": open_count,
+        "pending": pending_count,
         "inProgress": in_progress_count,
         "resolved": resolved_count,
         "resolutionRate": round((resolved_count / total) * 100, 2) if total > 0 else 0,
@@ -81,8 +83,9 @@ def _build_worker_productivity():
                 "_id": "$assignedTo",
                 "total": {"$sum": 1},
                 "resolved": {"$sum": {"$cond": [{"$eq": ["$status", "resolved"]}, 1, 0]}},
-                "inProgress": {"$sum": {"$cond": [{"$eq": ["$status", "in_progress"]}, 1, 0]}},
+                "inProgress": {"$sum": {"$cond": [{"$in": ["$status", ["in_progress", "verified"]]}, 1, 0]}},
                 "open": {"$sum": {"$cond": [{"$eq": ["$status", "open"]}, 1, 0]}},
+                "pending": {"$sum": {"$cond": [{"$eq": ["$status", "pending"]}, 1, 0]}},
             }
         },
         {"$sort": {"resolved": -1, "total": -1}},
@@ -101,6 +104,7 @@ def _build_worker_productivity():
         resolved = int(row.get("resolved", 0))
         in_progress = int(row.get("inProgress", 0))
         open_count = int(row.get("open", 0))
+        pending_count = int(row.get("pending", 0))
         raw_worker = row.get("_id")
         worker_key = str(raw_worker).strip() if raw_worker is not None else ""
         output.append(
@@ -109,6 +113,7 @@ def _build_worker_productivity():
                 "total": total,
                 "resolved": resolved,
                 "open": open_count,
+                "pending": pending_count,
                 "inProgress": in_progress,
                 "resolutionRate": round((resolved / total) * 100, 2) if total > 0 else 0,
             }

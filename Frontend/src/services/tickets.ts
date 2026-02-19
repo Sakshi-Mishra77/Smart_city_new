@@ -7,7 +7,7 @@ export interface Ticket {
   description?: string;
   category: string;
   priority: 'low' | 'medium' | 'high' | 'critical';
-  status: 'open' | 'in_progress' | 'resolved' | 'verified';
+  status: 'open' | 'pending' | 'in_progress' | 'resolved' | 'verified';
   location: string;
   latitude?: number;
   longitude?: number;
@@ -18,6 +18,27 @@ export interface Ticket {
   assigneePhotoUrl?: string;
   assigneeEmail?: string;
   assigneeUserId?: string;
+  workerId?: string;
+  workerIds?: string[];
+  assignees?: Array<{
+    workerId: string;
+    name: string;
+    phone?: string;
+    email?: string;
+    workerSpecialization?: string;
+    assignedAt?: string;
+  }>;
+  workerSpecialization?: string;
+  workerSpecializations?: string[];
+  fieldInspectorId?: string;
+  fieldInspectorName?: string;
+  progressPercent?: number;
+  progressSummary?: string;
+  progressSource?: string;
+  progressConfidence?: number;
+  progressUpdatedAt?: string;
+  lastInspectorUpdateAt?: string;
+  lastWorkerUpdateAt?: string;
   reopenedBy?: {
     id?: string;
     name?: string;
@@ -27,6 +48,7 @@ export interface Ticket {
     message: string;
     issuedAt: string;
     supervisorName?: string;
+    departmentName?: string;
   };
   createdAt: string;
   updatedAt?: string;
@@ -35,6 +57,7 @@ export interface Ticket {
 export interface TicketStats {
   totalTickets: number;
   openTickets: number;
+  pendingTickets?: number;
   inProgress: number;
   resolvedToday: number;
   avgResponseTime: string;
@@ -47,11 +70,29 @@ export interface UpdateStatusData {
 }
 
 export interface AssignTicketData {
+  workerId?: string;
+  workerIds?: string[];
   assignedTo?: string;
   assigneeName?: string;
   assigneePhone?: string;
   assigneePhoto?: string;
   notes?: string;
+}
+
+export interface ProgressUpdateData {
+  updateText: string;
+}
+
+export interface TicketLogEntry {
+  id: string;
+  ticketId?: string;
+  incidentId?: string;
+  action: string;
+  actorUserId?: string;
+  actorName?: string;
+  actorOfficialRole?: string;
+  createdAt: string;
+  details?: Record<string, unknown>;
 }
 
 
@@ -89,6 +130,14 @@ export const ticketService = {
 
   async assignTicket(id: string, data: AssignTicketData): Promise<ApiResponse<Ticket>> {
     return apiClient.post<Ticket>(API_ENDPOINTS.TICKETS.ASSIGN(id), data);
+  },
+
+  async updateProgress(id: string, data: ProgressUpdateData): Promise<ApiResponse<Ticket>> {
+    return apiClient.post<Ticket>(API_ENDPOINTS.TICKETS.PROGRESS_UPDATE(id), data);
+  },
+
+  async getLogbook(id: string): Promise<ApiResponse<TicketLogEntry[]>> {
+    return apiClient.get<TicketLogEntry[]>(API_ENDPOINTS.TICKETS.LOGBOOK(id));
   },
 
   

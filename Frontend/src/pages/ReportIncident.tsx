@@ -45,6 +45,7 @@ const categories = [
   { value: 'streetlight', label: 'Streetlight Issue' },
   { value: 'water_leakage', label: 'Water Leakage' },
   { value: 'electricity', label: 'Electricity Issue' },
+  { value: 'fire', label: 'Fire Incident' },
   { value: 'drainage', label: 'Drainage / Sewer' },
   { value: 'safety', label: 'Safety / Security' },
   { value: 'other', label: 'Other' },

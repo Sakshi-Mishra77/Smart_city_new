@@ -49,6 +49,7 @@ export type IncidentCategory =
   | 'streetlight'
   | 'water_leakage'
   | 'electricity'
+  | 'fire'
   | 'safety'
   | 'road_damage'
   | 'drainage'
@@ -56,6 +57,7 @@ export type IncidentCategory =
 
 export type IncidentStatus = 
   | 'open'
+  | 'pending'
   | 'in_progress'
   | 'resolved'
   | 'verified'

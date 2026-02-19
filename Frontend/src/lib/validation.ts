@@ -9,6 +9,21 @@ export const emailSchema = z
   .email({ message: "Please enter a valid email address" })
   .max(255, { message: "Email must be less than 255 characters" });
 
+const optionalEmailSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") {
+      return value;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  },
+  z
+    .string()
+    .email({ message: "Please enter a valid email address" })
+    .max(255, { message: "Email must be less than 255 characters" })
+    .optional()
+);
+
 
 
 export const phoneSchema = z
@@ -53,16 +68,43 @@ export const phoneLoginSchema = z.object({
 // Registration schema
 export const registrationSchema = z.object({
   fullName: nameSchema,
-  email: emailSchema,
+  email: optionalEmailSchema,
   phone: phoneSchema,
   password: passwordSchema,
   confirmPassword: z.string(),
   address: z.string().trim().min(10, { message: "Please enter a complete address" }).max(500),
   pincode: z.string().regex(/^\d{6}$/, { message: "Please enter a valid 6-digit pincode" }),
-  userType: z.enum(['local', 'official', 'head_supervisor'], { required_error: "Please select user type" }),
+  userType: z.enum(['local', 'official'], { required_error: "Please select user type" }),
+  officialRole: z.enum(['department', 'supervisor', 'field_inspector', 'worker']).optional(),
+  workerSpecialization: z.string().trim().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],
+}).refine((data) => {
+  if (data.userType !== 'official') {
+    return true;
+  }
+  return !!data.officialRole;
+}, {
+  message: "Please select official role",
+  path: ["officialRole"],
+}).refine((data) => {
+  const needsEmail = data.userType === 'local' || (data.userType === 'official' && data.officialRole !== 'worker');
+  if (!needsEmail) {
+    return true;
+  }
+  return !!data.email;
+}, {
+  message: "Email is required",
+  path: ["email"],
+}).refine((data) => {
+  if (data.userType !== 'official' || data.officialRole !== 'worker') {
+    return true;
+  }
+  return !!(data.workerSpecialization && data.workerSpecialization.trim().length > 0);
+}, {
+  message: "Please select worker specialization",
+  path: ["workerSpecialization"],
 });
 
 // Forgot password schema

@@ -4,6 +4,7 @@ export interface PublicSummary {
   total: number;
   resolved: number;
   open: number;
+  pending?: number;
   inProgress: number;
   resolutionRate: number;
   recent: {

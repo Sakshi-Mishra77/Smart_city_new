@@ -5,12 +5,14 @@ export interface AnalyticsDashboard {
   incidents: {
     total: number;
     open: number;
+    pending?: number;
     inProgress: number;
     resolved: number;
   };
   tickets: {
     total: number;
     open: number;
+    pending?: number;
     inProgress: number;
     resolved: number;
   };
@@ -22,6 +24,7 @@ export interface AnalyticsDashboard {
     total: number;
     resolved: number;
     open: number;
+    pending?: number;
     inProgress: number;
     resolutionRate: number;
   }[];

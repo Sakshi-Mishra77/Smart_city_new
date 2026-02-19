@@ -25,6 +25,7 @@ import {
 
 const statusStyles: Record<string, string> = {
   open: 'badge-info',
+  pending: 'badge-warning',
   in_progress: 'badge-warning',
   resolved: 'badge-success',
   verified: 'badge-success',
@@ -54,7 +55,7 @@ const Dashboard = () => {
 
   const stats = useMemo(() => {
     const total = incidents.length;
-    const open = incidents.filter((i) => i.status === 'open').length;
+    const open = incidents.filter((i) => i.status === 'open' || i.status === 'pending').length;
     const inProgress = incidents.filter((i) => i.status === 'in_progress').length;
     const resolved = incidents.filter((i) => i.status === 'resolved').length;
     const critical = incidents.filter((i) => i.priority === 'critical').length;
