@@ -300,9 +300,9 @@ def _sanitize_incident_payload(payload: dict | None) -> dict | None:
 def _generate_ticket_id():
     now = datetime.utcnow()
     yymm = now.strftime("%y%m")
-    count = tickets.count_documents({"ticketId": {"$regex": f"^{yymm}_"}})
+    count = tickets.count_documents({"ticketId": {"$regex": f"^{yymm}"}})
     ticket_number = count + 1
-    return f"{yymm}_{ticket_number}"
+    return f"{yymm}{ticket_number}"
 
 def _create_ticket_from_incident(doc: dict):
     if not doc:
